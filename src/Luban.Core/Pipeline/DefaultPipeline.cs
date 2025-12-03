@@ -110,6 +110,15 @@ public class DefaultPipeline : IPipeline
     protected void ProcessTargets()
     {
         var tasks = new List<Task>();
+        bool loaded = false;
+
+        // 当显式要求强制加载数据时，或者需要在模板中使用基于数据的 tag 表信息时，应当在生成代码前先加载数据
+        if (_args.ForceLoadTableDatas)
+        {
+            LoadDatas();
+            loaded = true;
+        }
+
         tasks.Add(Task.Run(() =>
         {
             foreach (string target in _args.CodeTargets)
@@ -120,9 +129,10 @@ public class DefaultPipeline : IPipeline
             }
         }));
 
-        if (_args.ForceLoadTableDatas || _args.DataTargets.Count > 0)
+        if (!loaded && _args.DataTargets.Count > 0)
         {
             LoadDatas();
+            loaded = true;
         }
 
         if (_args.DataTargets.Count > 0)

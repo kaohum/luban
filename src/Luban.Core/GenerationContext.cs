@@ -65,7 +65,15 @@ public class GenerationContext
 
     public List<string> ExcludeTags { get; private set; }
 
+    // 供模板等场景使用的“当前所有有效环境 tag”，通常为命令行 -i 传入的 tag
+    // 再加上默认基础环境 tag(_base_)
+    public IReadOnlyList<string> AllTags { get; private set; }
+
     private readonly ConcurrentDictionary<string, TableDataInfo> _recordsByTables = new();
+
+    private readonly Dictionary<string, List<DefTable>> _tablesByTag = new();
+
+    private readonly object _tablesByTagLock = new();
 
     public string TopModule => Target.TopModule;
 
@@ -89,6 +97,18 @@ public class GenerationContext
 
     private bool _exportEmptyGroupsTypes;
 
+    // key: tag (已统一为小写)，value: 在该 tag 下实际有数据导出的表列表
+    public IReadOnlyDictionary<string, List<DefTable>> TablesByTag
+    {
+        get
+        {
+            lock (_tablesByTagLock)
+            {
+                return new Dictionary<string, List<DefTable>>(_tablesByTag);
+            }
+        }
+    }
+
     public void LoadDatas()
     {
         s_logger.Info("load datas begin");
@@ -111,6 +131,21 @@ public class GenerationContext
         {
             throw new Exception("option '--includeTag <tag>' and '--excludeTag <tag>' can not be set at the same time");
         }
+
+        if (IncludeTags != null && IncludeTags.Count > 0)
+        {
+            var allTags = new List<string>(IncludeTags);
+            if (!allTags.Contains(Record.DefaultTag))
+            {
+                allTags.Add(Record.DefaultTag);
+            }
+            AllTags = allTags;
+        }
+        else
+        {
+            AllTags = Array.Empty<string>();
+        }
+
         TimeZone = TimeZoneUtil.GetTimeZone(builder.TimeZone);
         _exportEmptyGroupsTypes = builder.Assembly.Target.Groups.Any(g => GlobalConf.Groups.FirstOrDefault(gd => gd.Names.Contains(g))?.IsDefault == true);
 
@@ -202,9 +237,51 @@ public class GenerationContext
     public void AddDataTable(DefTable table, List<Record> mainRecords, List<Record> patchRecords)
     {
         s_logger.Debug("AddDataTable name:{} record count:{}", table.FullName, mainRecords.Count);
-        _recordsByTables[table.FullName] = new TableDataInfo(table,
-            mainRecords.Where(r => r.IsNotFiltered(IncludeTags, ExcludeTags)).ToList(),
-            patchRecords != null ? patchRecords.Where(r => r.IsNotFiltered(IncludeTags, ExcludeTags)).ToList() : null);
+        var filteredMain = mainRecords.Where(r => r.IsNotFiltered(IncludeTags, ExcludeTags)).ToList();
+        var filteredPatch = patchRecords != null ? patchRecords.Where(r => r.IsNotFiltered(IncludeTags, ExcludeTags)).ToList() : null;
+        var tableDataInfo = new TableDataInfo(table, filteredMain, filteredPatch);
+        _recordsByTables[table.FullName] = tableDataInfo;
+
+        // 统计各 tag 实际有数据的表列表，供模板使用
+        if (AllTags != null && AllTags.Count > 0 && tableDataInfo.FinalRecords != null && tableDataInfo.FinalRecords.Count > 0)
+        {
+            // 预先构建一个 HashSet，加速包含判断
+            var allTagSet = new HashSet<string>(AllTags, StringComparer.OrdinalIgnoreCase);
+
+            lock (_tablesByTagLock)
+            {
+                foreach (var rec in tableDataInfo.FinalRecords)
+                {
+                    if (rec.Tags == null || rec.Tags.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    foreach (var rawTag in rec.Tags)
+                    {
+                        if (string.IsNullOrWhiteSpace(rawTag))
+                        {
+                            continue;
+                        }
+                        var tag = rawTag.Trim().ToLowerInvariant();
+                        if (!allTagSet.Contains(tag))
+                        {
+                            continue;
+                        }
+
+                        if (!_tablesByTag.TryGetValue(tag, out var list))
+                        {
+                            list = new List<DefTable>();
+                            _tablesByTag.Add(tag, list);
+                        }
+                        if (!list.Contains(table))
+                        {
+                            list.Add(table);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public List<Record> GetTableAllDataList(DefTable table)

@@ -298,6 +298,19 @@ internal static class Program
 
     private static PipelineArguments CreatePipelineArgs(CommandOptions opts, LubanConfig config)
     {
+        static List<string> NormalizeTags(IEnumerable<string> rawTags)
+        {
+            if (rawTags == null)
+            {
+                return new List<string>();
+            }
+            return rawTags
+                .Select(t => t?.Trim().ToLowerInvariant())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Distinct()
+                .ToList();
+        }
+
         return new PipelineArguments()
         {
             Target = opts.Target,
@@ -307,8 +320,8 @@ internal static class Program
             OutputTables = opts.OutputTables?.ToList() ?? new List<string>(),
             CodeTargets = opts.CodeTargets?.ToList() ?? new List<string>(),
             DataTargets = opts.DataTargets?.ToList() ?? new List<string>(),
-            IncludeTags = opts.IncludeTags?.ToList() ?? new List<string>(),
-            ExcludeTags = opts.ExcludeTags?.ToList() ?? new List<string>(),
+            IncludeTags = NormalizeTags(opts.IncludeTags),
+            ExcludeTags = NormalizeTags(opts.ExcludeTags),
             Variants = ParseVariants(opts.Variants),
             TimeZone = opts.TimeZone,
         };
