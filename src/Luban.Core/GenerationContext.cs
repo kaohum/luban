@@ -67,7 +67,7 @@ public class GenerationContext
 
     // 供模板等场景使用的“当前所有有效环境 tag”，通常为命令行 -i 传入的 tag
     // 再加上默认基础环境 tag(_base_)
-    public IReadOnlyList<string> AllTags { get; private set; }
+    public List<string> AllTags { get; private set; }
 
     private readonly ConcurrentDictionary<string, TableDataInfo> _recordsByTables = new();
 
@@ -143,7 +143,7 @@ public class GenerationContext
         }
         else
         {
-            AllTags = Array.Empty<string>();
+            AllTags = new List<string>();
         }
 
         TimeZone = TimeZoneUtil.GetTimeZone(builder.TimeZone);

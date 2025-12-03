@@ -34,7 +34,7 @@ namespace Luban.DataExporter.Builtin;
 [DataExporter("tag-split")]
 public class TagSplitDataExporter : DataExporterBase
 {
-    private static IReadOnlyList<string> GetAllTagsForExport(GenerationContext ctx)
+    private static List<string> GetAllTagsForExport(GenerationContext ctx)
     {
         // GenerationContext.AllTags 已经包含 (IncludeTags + 默认 _base_)，
         // 如果调用端没有传 -i，则 AllTags 为空列表。
@@ -42,7 +42,7 @@ public class TagSplitDataExporter : DataExporterBase
         {
             return ctx.AllTags;
         }
-        return Array.Empty<string>();
+        return new List<string>();
     }
 
     private static bool RecordHasTag(Record rec, string tag)

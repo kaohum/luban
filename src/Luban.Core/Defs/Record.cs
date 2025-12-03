@@ -24,7 +24,7 @@ namespace Luban.Defs;
 
 public class Record
 {
-    public const string DefaultTag = "base";
+    public const string DefaultTag = "basic";
 
     public int AutoIndex { get; set; }
 
