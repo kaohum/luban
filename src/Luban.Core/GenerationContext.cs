@@ -21,6 +21,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
+using System.Linq;
 using Luban.CodeFormat;
 using Luban.CodeTarget;
 using Luban.DataLoader;
@@ -152,7 +153,10 @@ public class GenerationContext
         TextProvider = EnvManager.Current.TryGetOption(BuiltinOptionNames.L10NFamily, BuiltinOptionNames.L10NProviderName, false, out string providerName) ?
             L10NManager.Ins.CreateTextProvider(providerName) : null;
 
-        ExportTables = Assembly.ExportTables;
+        // 确保导出用的表在全局范围内按表名稳定排序，便于模板等场景使用（例如 __tables）
+        ExportTables = Assembly.ExportTables
+            .OrderBy(t => t.Name)
+            .ToList();
         ExportTypes = CalculateExportTypes();
         ExportBeans = SortBeanTypes(ExportTypes.OfType<DefBean>().ToList());
         ExportEnums = ExportTypes.OfType<DefEnum>().ToList();
