@@ -24,6 +24,59 @@ using Luban.Utils;
 
 namespace Luban.Defs;
 
+// 索引键包装类，支持单个字段或组合字段
+public class IndexKey : IEquatable<IndexKey>
+{
+    public List<DType> Keys { get; }
+
+    public IndexKey(List<DType> keys)
+    {
+        Keys = keys;
+    }
+
+    public IndexKey(DType singleKey)
+    {
+        Keys = new List<DType> { singleKey };
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is IndexKey other && Equals(other);
+    }
+
+    public bool Equals(IndexKey other)
+    {
+        if (other == null || Keys.Count != other.Keys.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < Keys.Count; i++)
+        {
+            if (!Keys[i].Equals(other.Keys[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public override int GetHashCode()
+    {
+        int hash = 17;
+        foreach (var key in Keys)
+        {
+            hash = hash * 31 + (key?.GetHashCode() ?? 0);
+        }
+        return hash;
+    }
+
+    public override string ToString()
+    {
+        return Keys.Count == 1 ? Keys[0].ToString() : $"({string.Join(", ", Keys)})";
+    }
+}
+
 public class TableDataInfo
 {
     private static readonly NLog.Logger s_logger = NLog.LogManager.GetCurrentClassLogger();
@@ -38,7 +91,7 @@ public class TableDataInfo
 
     public Dictionary<DType, Record> FinalRecordMap { get; private set; }
 
-    public Dictionary<string, Dictionary<DType, Record>> FinalRecordMapByIndexs { get; private set; }
+    public Dictionary<string, Dictionary<IndexKey, Record>> FinalRecordMapByIndexs { get; private set; }
 
     private static bool HasSameTag(Record a, Record b)
     {
@@ -186,17 +239,35 @@ public class TableDataInfo
                 {
                     throw new Exception($"配置表 '{table.FullName}' 是list表.不支持patch");
                 }
-                var recordMapByIndexs = new Dictionary<string, Dictionary<DType, Record>>();
-                if (table.IsUnionIndex)
+                var recordMapByIndexs = new Dictionary<string, Dictionary<IndexKey, Record>>();
+                
+                // 遍历每个索引项（可能是单个字段索引或组合字段索引）
+                foreach (var indexInfo in table.IndexList)
                 {
-                    var unionRecordsByKey = new Dictionary<List<DType>, List<Record>>(ListEqualityComparer<DType>.Default); // comparetor
+                    var recordMap = new Dictionary<IndexKey, Record>();
+                    var recordsByKey = new Dictionary<IndexKey, List<Record>>();
+                    
                     foreach (Record r in mainRecords)
                     {
-                        var unionKeys = table.IndexList.Select(idx => r.Data.Fields[idx.IndexFieldIdIndex]).ToList();
-                        if (!unionRecordsByKey.TryGetValue(unionKeys, out var list))
+                        IndexKey key;
+                        
+                        // 如果是组合索引，需要组合多个字段的值
+                        if (indexInfo.IsUnionIndex)
+                        {
+                            var unionKeys = indexInfo.IndexFieldIdIndexes.Select(idx => r.Data.Fields[idx]).ToList();
+                            key = new IndexKey(unionKeys);
+                        }
+                        else
+                        {
+                            // 单个字段索引
+                            key = new IndexKey(r.Data.Fields[indexInfo.IndexFieldIdIndex]);
+                        }
+                        
+                        // 检查键是否重复
+                        if (!recordsByKey.TryGetValue(key, out var list))
                         {
                             list = new List<Record>();
-                            unionRecordsByKey.Add(unionKeys, list);
+                            recordsByKey.Add(key, list);
                         }
                         else
                         {
@@ -204,7 +275,7 @@ public class TableDataInfo
                             {
                                 if (HasSameTag(existed, r))
                                 {
-                                    throw new Exception($@"配置表 '{table.FullName}' 主文件 主键字段:'{table.Index}' 主键值:'{StringUtil.CollectionToString(unionKeys)}' 重复.
+                                    throw new Exception($@"配置表 '{table.FullName}' 主文件 主键字段:'{indexInfo.IndexName}' 主键值:'{key}' 重复.
         记录1 来自文件:{existed.Source}
         记录2 来自文件:{r.Source}
 ");
@@ -212,53 +283,12 @@ public class TableDataInfo
                             }
                         }
                         list.Add(r);
+                        recordMap[key] = r;
                     }
-
-                    // 联合索引的 独立子索引允许有重复key
-                    foreach (var indexInfo in table.IndexList)
-                    {
-                        var recordMap = new Dictionary<DType, Record>();
-                        foreach (Record r in mainRecords)
-                        {
-                            DType key = r.Data.Fields[indexInfo.IndexFieldIdIndex];
-                            recordMap[key] = r;
-                        }
-                        recordMapByIndexs.Add(indexInfo.IndexField.Name, recordMap);
-                    }
+                    
+                    recordMapByIndexs.Add(indexInfo.IndexName, recordMap);
                 }
-                else
-                {
-                    foreach (var indexInfo in table.IndexList)
-                    {
-                        var recordMap = new Dictionary<DType, Record>();
-                        var recordsByKey = new Dictionary<DType, List<Record>>();
-                        foreach (Record r in mainRecords)
-                        {
-                            DType key = r.Data.Fields[indexInfo.IndexFieldIdIndex];
-                            if (!recordsByKey.TryGetValue(key, out var list))
-                            {
-                                list = new List<Record>();
-                                recordsByKey.Add(key, list);
-                            }
-                            else
-                            {
-                                foreach (var existed in list)
-                                {
-                                    if (HasSameTag(existed, r))
-                                    {
-                                        throw new Exception($@"配置表 '{table.FullName}' 主文件 主键字段:'{indexInfo.IndexField.Name}' 主键值:'{key}' 重复.
-        记录1 来自文件:{existed.Source}
-        记录2 来自文件:{r.Source}
-");
-                                    }
-                                }
-                            }
-                            list.Add(r);
-                            recordMap[key] = r;
-                        }
-                        recordMapByIndexs.Add(indexInfo.IndexField.Name, recordMap);
-                    }
-                }
+                
                 this.FinalRecordMapByIndexs = recordMapByIndexs;
                 FinalRecords = mainRecords;
                 break;

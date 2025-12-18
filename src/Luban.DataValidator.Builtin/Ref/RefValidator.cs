@@ -121,7 +121,9 @@ public class RefValidator : DataValidatorBase
                 case TableMode.LIST:
                 {
                     var recordMap = genCtx.GetTableDataInfo(defTable).FinalRecordMapByIndexs[field];
-                    if (recordMap.TryGetValue(key, out Record rec))
+                    // 将 DType 键包装成 IndexKey
+                    var indexKey = new IndexKey(key);
+                    if (recordMap.TryGetValue(indexKey, out Record rec))
                     {
                         /*
                         if (!rec.IsNotFiltered(excludeTags))
@@ -221,10 +223,16 @@ public class RefValidator : DataValidatorBase
             {
                 throw new Exception($"field:'{field}' ref:{actualTable} 是list表，必须显式指定索引字段");
             }
-            var indexField = table.IndexList.Find(k => k.IndexField.Name == indexName);
-            if (indexField?.Type == null)
+            // 支持单个字段索引和组合索引名称（如 "a" 或 "a+b"）
+            var indexField = table.IndexList.Find(k => k.IndexName == indexName);
+            if (indexField == null)
             {
                 throw new Exception($"field:'{field}' 索引字段:{indexName} 不是被引用的list表:{actualTable} 的索引字段，合法值为'{table.Index}'之一");
+            }
+            // 对于组合索引，不支持直接引用（因为类型不匹配）
+            if (indexField.IsUnionIndex)
+            {
+                throw new Exception($"field:'{field}' 索引字段:{indexName} 是组合索引，不支持直接引用。请引用单个字段索引。");
             }
             if (indexField.Type.TypeName != fieldTypeName)
             {

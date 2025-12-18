@@ -26,7 +26,25 @@ using Luban.Validator;
 
 namespace Luban.Defs;
 
-public record class IndexInfo(TType Type, DefField IndexField, int IndexFieldIdIndex);
+public record class IndexInfo(List<DefField> IndexFields, List<int> IndexFieldIdIndexes)
+{
+    // 是否为组合索引
+    public bool IsUnionIndex => IndexFields.Count > 1;
+    
+    // 主索引字段（第一个字段）
+    public DefField PrimaryIndexField => IndexFields[0];
+    
+    // 主索引字段的ID索引
+    public int PrimaryIndexFieldIdIndex => IndexFieldIdIndexes[0];
+    
+    // 获取索引名称（用于显示）
+    public string IndexName => string.Join("+", IndexFields.Select(f => f.Name));
+    
+    // 兼容旧代码的属性
+    public TType Type => IndexFields[0].CType;
+    public DefField IndexField => IndexFields[0];
+    public int IndexFieldIdIndex => IndexFieldIdIndexes[0];
+};
 
 public class DefTable : DefTypeBase
 {
@@ -132,31 +150,50 @@ public class DefTable : DefTypeBase
                 }
                 KeyTType = IndexField.CType;
                 Type = TMap.Create(false, null, KeyTType, ValueTType, false);
-                this.IndexList.Add(new IndexInfo(KeyTType, IndexField, IndexFieldIdIndex));
+                this.IndexList.Add(new IndexInfo(new List<DefField> { IndexField }, new List<int> { IndexFieldIdIndex }));
                 break;
             }
             case TableMode.LIST:
             {
-                var indexs = Index.Split('+', ',').Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
-                foreach (var idx in indexs)
+                // 先按逗号分割，得到各个索引项（可能是单个字段或组合字段）
+                var indexItems = Index.Split(',').Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
+                
+                foreach (var indexItem in indexItems)
                 {
-                    if (ValueTType.DefBean.TryGetField(idx, out var f, out var i))
+                    // 对每个索引项按加号分割，判断是单个索引还是组合索引
+                    var fieldNames = indexItem.Split('+').Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).ToList();
+                    
+                    var indexFields = new List<DefField>();
+                    var indexFieldIdIndexes = new List<int>();
+                    
+                    foreach (var fieldName in fieldNames)
                     {
-                        if (IndexField == null)
+                        if (ValueTType.DefBean.TryGetField(fieldName, out var f, out var i))
                         {
-                            IndexField = f;
-                            IndexFieldIdIndex = i;
+                            indexFields.Add(f);
+                            indexFieldIdIndexes.Add(i);
+                            
+                            // 设置主索引字段（第一个字段）
+                            if (IndexField == null)
+                            {
+                                IndexField = f;
+                                IndexFieldIdIndex = i;
+                            }
                         }
-                        this.IndexList.Add(new IndexInfo(f.CType, f, i));
+                        else
+                        {
+                            throw new Exception($"table:'{FullName}' index:'{fieldName}' 字段不存在");
+                        }
                     }
-                    else
-                    {
-                        throw new Exception($"table:'{FullName}' index:'{idx}' 字段不存在");
-                    }
+                    
+                    this.IndexList.Add(new IndexInfo(indexFields, indexFieldIdIndexes));
                 }
-                // 如果不是 union index, 每个key必须唯一，否则 (key1,..,key n)唯一
-                IsUnionIndex = IndexList.Count > 1 && !Index.Contains(',');
-                MultiKey = IndexList.Count > 1 && Index.Contains(',');
+                
+                // 判断是否有组合索引或多个独立索引
+                // MultiKey: 多个独立索引（用逗号分隔）
+                // IsUnionIndex: 有至少一个组合索引（用加号连接）
+                MultiKey = IndexList.Count > 1 && IndexList.All(idx => !idx.IsUnionIndex);
+                IsUnionIndex = IndexList.Any(idx => idx.IsUnionIndex);
                 break;
             }
             default:
