@@ -274,7 +274,7 @@ public class GenerationContext
             }
         }
 
-        keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));
+        //keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));
         _l10nKeyInfos = BuildL10NKeyInfos(keys);
         return _l10nKeyInfos;
     }
