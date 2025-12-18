@@ -333,9 +333,21 @@ public class GenerationContext
     private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<(string, string)> keys)
     {
         var result = new List<L10NKeyInfo>();
+        var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var key in keys)
         {
-            result.Add(new L10NKeyInfo(key.Item1, key.Item2));
+            string fieldName = MakeIdentifier(key.Item1);
+            if (nameCount.TryGetValue(fieldName, out int count))
+            {
+                count++;
+                nameCount[fieldName] = count;
+                fieldName = $"{fieldName}_{count}";
+            }
+            else
+            {
+                nameCount[fieldName] = 1;
+            }
+            result.Add(new L10NKeyInfo(key.Item1, fieldName, key.Item2));
         }
         return result;
     }

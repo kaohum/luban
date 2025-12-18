@@ -20,5 +20,5 @@
 
 namespace Luban;
 
-public record L10NKeyInfo(string Key, string Key2);
+public record L10NKeyInfo(string Key, string FieldName, string Key2);
 
