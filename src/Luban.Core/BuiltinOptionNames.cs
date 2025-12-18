@@ -53,6 +53,7 @@ public static class BuiltinOptionNames
     public const string L10NTextFilePath = "textFile.path";
 
     public const string L10NTextFileKeyFieldName = "textFile.keyFieldName";
+    public const string L10NTextFileKeyFieldDesc = "textFile.keyFieldDesc";
 
     public const string L10NTextFileLanguageFieldName = "textFile.languageFieldName";
 

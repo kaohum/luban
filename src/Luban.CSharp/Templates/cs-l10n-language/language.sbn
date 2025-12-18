@@ -5,12 +5,26 @@ namespace {{ __namespace }}
 
 public class {{ __class_name }}
 {
+{{~ $index = 0 ~}}
 {{ for k in __keys -}}
-    public string {{ k.identifier }} = Get("{{ k.key }}");
+{{~ $index=$index+1 ~}}
+{{~ if $index > 3000 ~}}
+{{~ break ~}}
+{{~ end ~}}
+{{~ $raw_desc = k.key2 != null ? k.key2 : "" ~}}
+{{~ $desc = $raw_desc | string.replace "\r\n" "\n" | string.replace "\r" "\n" ~}}
+{{~ $desc_lines = $desc | string.split "\n" ~}}
+	/// <summary>
+    {{ for line in $desc_lines -}}
+    {{~ $line_trim = line | string.strip ~}}
+    /// {{ $line_trim }}
+    {{ end -}}
+    /// </summary>
+    public static string _{{ k.key }} = Get("{{ k.key }}");
+
 {{ end -}}
 }
 
 {{ if __namespace && __namespace != "" -}}
 }
 {{ end -}}
-

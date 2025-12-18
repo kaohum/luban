@@ -91,6 +91,7 @@ public class GenerationContext
     public IReadOnlyList<string> L10NLanguages { get; private set; } = Array.Empty<string>();
 
     public string L10NTextKeyFieldName { get; private set; }
+    public string L10NTextKeyFieldDesc { get; private set; }
 
     public bool IsL10NBinarySplitDataExporter { get; private set; }
 
@@ -194,6 +195,7 @@ public class GenerationContext
         DataExporterName = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.DataExporter, true, "default");
         L10NLanguages = L10NOptionUtil.GetLanguages();
         L10NTextKeyFieldName = L10NOptionUtil.GetKeyFieldName();
+        L10NTextKeyFieldDesc = L10NOptionUtil.GetKeyFieldDesc();
         IsL10NBinarySplitDataExporter = string.Equals(DataExporterName, "l10n-bin-split", StringComparison.OrdinalIgnoreCase);
 
         // 确保导出用的表在全局范围内按表名稳定排序，便于模板等场景使用（例如 __tables）
@@ -218,8 +220,9 @@ public class GenerationContext
         }
 
         var keyFieldName = L10NTextKeyFieldName;
+        var keyFieldDesc = L10NTextKeyFieldDesc;
         var langSet = new HashSet<string>(L10NLanguages, StringComparer.Ordinal);
-        var keys = new List<string>();
+        var keys = new List<(string, string)>();
         var keySet = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var table in ExportTables)
@@ -234,11 +237,13 @@ public class GenerationContext
             {
                 continue;
             }
-
+            
             if (!_recordsByTables.TryGetValue(table.FullName, out var tableDataInfo) || tableDataInfo.FinalRecords == null)
             {
                 continue;
             }
+            
+            var hasDesc = HasStringField(bean, keyFieldDesc);
 
             foreach (var record in tableDataInfo.FinalRecords)
             {
@@ -254,12 +259,22 @@ public class GenerationContext
 
                 if (keySet.Add(keyValue.Value))
                 {
-                    keys.Add(keyValue.Value);
+                    var descContent = string.Empty;
+                    if (hasDesc)
+                    {
+                        var descValue = data.GetField(keyFieldDesc) as DString;
+                        if (descValue != null && !string.IsNullOrEmpty(descValue.Value))
+                        {
+                            descContent = descValue.Value;
+                        }
+                    }
+                    s_logger.Info("keys add {} {}, {}", keyValue.Value, descContent, hasDesc);            
+                    keys.Add((keyValue.Value, descContent));
                 }
             }
         }
 
-        keys.Sort(StringComparer.Ordinal);
+        keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));
         _l10nKeyInfos = BuildL10NKeyInfos(keys);
         return _l10nKeyInfos;
     }
@@ -315,24 +330,12 @@ public class GenerationContext
         return false;
     }
 
-    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<string> keys)
+    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<(string, string)> keys)
     {
         var result = new List<L10NKeyInfo>();
-        var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var key in keys)
         {
-            string fieldName = MakeIdentifier(key);
-            if (nameCount.TryGetValue(fieldName, out int count))
-            {
-                count++;
-                nameCount[fieldName] = count;
-                fieldName = $"{fieldName}_{count}";
-            }
-            else
-            {
-                nameCount[fieldName] = 1;
-            }
-            result.Add(new L10NKeyInfo(key, fieldName));
+            result.Add(new L10NKeyInfo(key.Item1, key.Item2));
         }
         return result;
     }

@@ -48,5 +48,12 @@ public static class L10NOptionUtil
         return EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
             BuiltinOptionNames.L10NTextFileKeyFieldName, false, "id");
     }
+
+    public static string GetKeyFieldDesc()
+    {
+        // 与各 L10N 数据导出器保持一致的默认 key 字段解析
+        return EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
+            BuiltinOptionNames.L10NTextFileKeyFieldDesc, false, "desc");
+    }
 }
 
