@@ -1,0 +1,16 @@
+{{ if __namespace && __namespace != "" -}}
+namespace {{ __namespace }}
+{
+{{ end -}}
+
+public class {{ __class_name }}
+{
+{{ for k in __keys -}}
+    public string {{ k.identifier }} = Get("{{ k.key }}");
+{{ end -}}
+}
+
+{{ if __namespace && __namespace != "" -}}
+}
+{{ end -}}
+

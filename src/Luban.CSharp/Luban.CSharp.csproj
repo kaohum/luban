@@ -40,6 +40,7 @@
     <ItemGroup>
       <Folder Include="Templates\common\" />
       <Folder Include="Templates\cs-editor-json\" />
+    <Folder Include="Templates\cs-l10n-language\" />
     </ItemGroup>
 
     <ItemGroup>
@@ -97,6 +98,13 @@
       <None Update="Templates\cs-editor-json\enum.sbn">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+    <None Update="Templates\cs-l10n-language\language.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     </ItemGroup>
+
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.CSharp.dll D:\work\slg\common\config\Tools\Luban" />
+    </Target>
 
 </Project>

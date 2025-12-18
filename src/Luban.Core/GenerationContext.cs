@@ -18,10 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+﻿using System;
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Linq;
+using System.Text;
 using Luban.CodeFormat;
 using Luban.CodeTarget;
 using Luban.DataLoader;
@@ -76,6 +78,22 @@ public class GenerationContext
 
     private readonly object _tablesByTagLock = new();
 
+    private bool _datasLoaded;
+
+    private readonly object _loadDatasLock = new();
+
+    private List<L10NKeyInfo> _l10nKeyInfos;
+
+    // dataExporter 名称（例如 default、l10n-bin-split），供模板感知当前导出模式
+    public string DataExporterName { get; private set; }
+
+    // l10n 相关配置，便于模板直接复用
+    public IReadOnlyList<string> L10NLanguages { get; private set; } = Array.Empty<string>();
+
+    public string L10NTextKeyFieldName { get; private set; }
+
+    public bool IsL10NBinarySplitDataExporter { get; private set; }
+
     public string TopModule => Target.TopModule;
 
     public List<DefTable> Tables => Assembly.GetAllTables();
@@ -98,6 +116,8 @@ public class GenerationContext
 
     private bool _exportEmptyGroupsTypes;
 
+    public bool DatasLoaded => _datasLoaded;
+
     // key: tag (已统一为小写)，value: 在该 tag 下实际有数据导出的表列表
     public IReadOnlyDictionary<string, List<DefTable>> TablesByTag
     {
@@ -112,10 +132,27 @@ public class GenerationContext
 
     public void LoadDatas()
     {
-        s_logger.Info("load datas begin");
-        TextProvider?.Load();
-        DataLoaderManager.Ins.LoadDatas(this);
-        s_logger.Info("load datas end");
+        if (_datasLoaded)
+        {
+            s_logger.Info("load datas skip (already loaded)");
+            return;
+        }
+
+        lock (_loadDatasLock)
+        {
+            if (_datasLoaded)
+            {
+                s_logger.Info("load datas skip (already loaded)");
+                return;
+            }
+
+            s_logger.Info("load datas begin");
+            _l10nKeyInfos = null;
+            TextProvider?.Load();
+            DataLoaderManager.Ins.LoadDatas(this);
+            _datasLoaded = true;
+            s_logger.Info("load datas end");
+        }
     }
 
     public GenerationContext()
@@ -153,6 +190,12 @@ public class GenerationContext
         TextProvider = EnvManager.Current.TryGetOption(BuiltinOptionNames.L10NFamily, BuiltinOptionNames.L10NProviderName, false, out string providerName) ?
             L10NManager.Ins.CreateTextProvider(providerName) : null;
 
+        // 记录 dataExporter 及 l10n 选项，方便模板在生成代码时直接使用
+        DataExporterName = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.DataExporter, true, "default");
+        L10NLanguages = L10NOptionUtil.GetLanguages();
+        L10NTextKeyFieldName = L10NOptionUtil.GetKeyFieldName();
+        IsL10NBinarySplitDataExporter = string.Equals(DataExporterName, "l10n-bin-split", StringComparison.OrdinalIgnoreCase);
+
         // 确保导出用的表在全局范围内按表名稳定排序，便于模板等场景使用（例如 __tables）
         ExportTables = Assembly.ExportTables
             .OrderBy(t => t.Name)
@@ -160,6 +203,65 @@ public class GenerationContext
         ExportTypes = CalculateExportTypes();
         ExportBeans = SortBeanTypes(ExportTypes.OfType<DefBean>().ToList());
         ExportEnums = ExportTypes.OfType<DefEnum>().ToList();
+    }
+
+    public IReadOnlyList<L10NKeyInfo> GetL10NKeyInfos()
+    {
+        if (_l10nKeyInfos != null)
+        {
+            return _l10nKeyInfos;
+        }
+
+        if (!DatasLoaded || L10NLanguages.Count == 0)
+        {
+            return Array.Empty<L10NKeyInfo>();
+        }
+
+        var keyFieldName = L10NTextKeyFieldName;
+        var langSet = new HashSet<string>(L10NLanguages, StringComparer.Ordinal);
+        var keys = new List<string>();
+        var keySet = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var table in ExportTables)
+        {
+            if (table.ValueTType is not TBean tbean)
+            {
+                continue;
+            }
+
+            var bean = tbean.DefBean;
+            if (!HasStringField(bean, keyFieldName) || !HasAnyLanguageField(bean, langSet))
+            {
+                continue;
+            }
+
+            if (!_recordsByTables.TryGetValue(table.FullName, out var tableDataInfo) || tableDataInfo.FinalRecords == null)
+            {
+                continue;
+            }
+
+            foreach (var record in tableDataInfo.FinalRecords)
+            {
+                if (record.Data is not DBean data)
+                {
+                    continue;
+                }
+                var keyValue = data.GetField(keyFieldName) as DString;
+                if (keyValue == null || string.IsNullOrEmpty(keyValue.Value))
+                {
+                    continue;
+                }
+
+                if (keySet.Add(keyValue.Value))
+                {
+                    keys.Add(keyValue.Value);
+                }
+            }
+        }
+
+        keys.Sort(StringComparer.Ordinal);
+        _l10nKeyInfos = BuildL10NKeyInfos(keys);
+        return _l10nKeyInfos;
     }
 
     private void AddChildrenByOrder(List<DefBean> list, DefBean bean)
@@ -194,6 +296,61 @@ public class GenerationContext
         }
         Debug.Assert(types.Count == sortedBeans.Count);
         return sortedBeans;
+    }
+
+    private static bool HasStringField(DefBean bean, string fieldName)
+    {
+        return bean.Fields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal))?.CType is TString;
+    }
+
+    private static bool HasAnyLanguageField(DefBean bean, HashSet<string> langSet)
+    {
+        foreach (var f in bean.Fields)
+        {
+            if (langSet.Contains(f.Name) && f.CType is TString)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<string> keys)
+    {
+        var result = new List<L10NKeyInfo>();
+        var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var key in keys)
+        {
+            string fieldName = MakeIdentifier(key);
+            if (nameCount.TryGetValue(fieldName, out int count))
+            {
+                count++;
+                nameCount[fieldName] = count;
+                fieldName = $"{fieldName}_{count}";
+            }
+            else
+            {
+                nameCount[fieldName] = 1;
+            }
+            result.Add(new L10NKeyInfo(key, fieldName));
+        }
+        return result;
+    }
+
+    private static string MakeIdentifier(string key)
+    {
+        var sb = new StringBuilder();
+        foreach (char ch in key)
+        {
+            sb.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
+        }
+
+        if (sb.Length == 0 || char.IsDigit(sb[0]))
+        {
+            sb.Insert(0, '_');
+        }
+
+        return sb.ToString();
     }
 
     private bool NeedExportNotDefault(List<string> groups)
@@ -281,6 +438,8 @@ public class GenerationContext
                         if (!list.Contains(table))
                         {
                             list.Add(table);
+                            list.Sort((a, b) => string.Compare(a.FullName, b.FullName, StringComparison.Ordinal));
+                            s_logger.Debug("AddDataTable Add Tag {}, name:{} record count:{}", tag, table.FullName, mainRecords.Count);
                         }
                     }
                 }

@@ -43,30 +43,6 @@ namespace Luban.DataExporter.Builtin;
 [DataExporter("l10n-json-split")]
 public class L10NJsonSplitDataExporter : DataExporterBase
 {
-    private static IReadOnlyList<string> GetLanguages()
-    {
-        // 例：-x l10n.languages=zh_CN,en_US,ja_JP
-        string langs = EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily, "languages", false, "");
-        if (string.IsNullOrWhiteSpace(langs))
-        {
-            return Array.Empty<string>();
-        }
-
-        return langs
-            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => s.Trim())
-            .Where(s => !string.IsNullOrEmpty(s))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-    }
-
-    private static string GetKeyFieldName()
-    {
-        // 复用 textFile.keyFieldName 配置；如未设置则使用常见的 id 作为默认 key 字段
-        return EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
-            BuiltinOptionNames.L10NTextFileKeyFieldName, false, "id");
-    }
-
     private static bool KeepMergedJson()
     {
         // 是否保留原始“合并语言”的 json（默认为 false，只导出按语言拆分后的文件）
@@ -200,7 +176,7 @@ public class L10NJsonSplitDataExporter : DataExporterBase
             return;
         }
 
-        var languages = GetLanguages();
+        var languages = ctx.L10NLanguages;
         // 未配置任何语言时，完全复用默认行为
         if (languages.Count == 0)
         {
@@ -208,7 +184,7 @@ public class L10NJsonSplitDataExporter : DataExporterBase
             return;
         }
 
-        string keyFieldName = GetKeyFieldName();
+        string keyFieldName = ctx.L10NTextKeyFieldName;
         bool keepMerged = KeepMergedJson();
 
         var tables = dataTarget.ExportAllRecords ? ctx.Tables : ctx.ExportTables;

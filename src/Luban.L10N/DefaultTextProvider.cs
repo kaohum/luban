@@ -46,6 +46,11 @@ public class DefaultTextProvider : ITextProvider
     {
         EnvManager env = EnvManager.Current;
 
+        s_logger.Info("DefaultTextProvider load");
+        // 每次加载前清空状态，避免重复加载时误判重复 key
+        _texts.Clear();
+        _unknownTextKeys.Clear();
+
         _keyFieldName = env.GetOptionOrDefault(BuiltinOptionNames.L10NFamily, BuiltinOptionNames.L10NTextFileKeyFieldName, false, "");
         if (string.IsNullOrWhiteSpace(_keyFieldName))
         {

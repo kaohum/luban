@@ -18,24 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using Luban.Types;
-using Luban.TypeVisitors;
+namespace Luban;
 
-namespace Luban.CSharp.TypeVisitors;
+public record L10NKeyInfo(string Key, string Identifier);
 
-public class BinaryDeserializeVisitor : DecoratorFuncVisitor<string, string, string>
-{ 
-    public static BinaryDeserializeVisitor Ins { get; } = new();
-
-    public override string DoAccept(TType type, string bufName, string fieldName)
-    {
-        if (type.IsNullable)
-        {
-            return $"if({bufName}.ReadBool()){{ {type.Apply(BinaryUnderlyingDeserializeVisitor.Ins, bufName, fieldName, 0)} }} else {{ {fieldName} = null; }}";
-        }
-        else
-        {
-            return type.Apply(BinaryUnderlyingDeserializeVisitor.Ins, bufName, fieldName, 0);
-        }
-    }
-}

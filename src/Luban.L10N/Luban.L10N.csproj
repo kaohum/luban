@@ -11,4 +11,8 @@
       <ProjectReference Include="..\Luban.DataLoader.Builtin\Luban.DataLoader.Builtin.csproj" />
     </ItemGroup>
 
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.L10N.dll D:\work\slg\common\config\Tools\Luban" />
+    </Target>
+
 </Project>

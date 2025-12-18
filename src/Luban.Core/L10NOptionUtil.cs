@@ -18,24 +18,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using Luban.Types;
-using Luban.TypeVisitors;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
-namespace Luban.CSharp.TypeVisitors;
+namespace Luban;
 
-public class BinaryDeserializeVisitor : DecoratorFuncVisitor<string, string, string>
-{ 
-    public static BinaryDeserializeVisitor Ins { get; } = new();
-
-    public override string DoAccept(TType type, string bufName, string fieldName)
+public static class L10NOptionUtil
+{
+    public static IReadOnlyList<string> GetLanguages()
     {
-        if (type.IsNullable)
+        string langs = EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily, "languages", false, "");
+        if (string.IsNullOrWhiteSpace(langs))
         {
-            return $"if({bufName}.ReadBool()){{ {type.Apply(BinaryUnderlyingDeserializeVisitor.Ins, bufName, fieldName, 0)} }} else {{ {fieldName} = null; }}";
+            return Array.Empty<string>();
         }
-        else
-        {
-            return type.Apply(BinaryUnderlyingDeserializeVisitor.Ins, bufName, fieldName, 0);
-        }
+
+        return langs
+            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public static string GetKeyFieldName()
+    {
+        // 与各 L10N 数据导出器保持一致的默认 key 字段解析
+        return EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
+            BuiltinOptionNames.L10NTextFileKeyFieldName, false, "id");
     }
 }
+

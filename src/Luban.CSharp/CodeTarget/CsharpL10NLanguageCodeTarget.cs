@@ -18,24 +18,41 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using Luban.Types;
-using Luban.TypeVisitors;
+using Luban.CodeTarget;
+using Scriban;
+using Scriban.Runtime;
 
-namespace Luban.CSharp.TypeVisitors;
+namespace Luban.CSharp.CodeTarget;
 
-public class BinaryDeserializeVisitor : DecoratorFuncVisitor<string, string, string>
-{ 
-    public static BinaryDeserializeVisitor Ins { get; } = new();
-
-    public override string DoAccept(TType type, string bufName, string fieldName)
+// 生成本地化 key 映射文件（依赖 l10n 数据已加载）
+[CodeTarget("cs-l10n-language")]
+public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
+{
+    public override void Handle(GenerationContext ctx, OutputFileManifest manifest)
     {
-        if (type.IsNullable)
+        // 确保可访问数据
+        ctx.LoadDatas();
+        var keys = ctx.GetL10NKeyInfos();
+
+        var template = GetTemplate("language");
+        var tplCtx = CreateTemplateContext(template);
+
+        string className = EnvManager.Current.GetOptionOrDefault(Name, "className", true, "LanguageFields");
+        string ns = ctx.Target.TopModule;
+
+        var extra = new ScriptObject
         {
-            return $"if({bufName}.ReadBool()){{ {type.Apply(BinaryUnderlyingDeserializeVisitor.Ins, bufName, fieldName, 0)} }} else {{ {fieldName} = null; }}";
-        }
-        else
-        {
-            return type.Apply(BinaryUnderlyingDeserializeVisitor.Ins, bufName, fieldName, 0);
-        }
+            { "__ctx", ctx },
+            { "__namespace", ns },
+            { "__class_name", className },
+            { "__keys", keys },
+        };
+        tplCtx.PushGlobal(extra);
+
+        var writer = new CodeWriter();
+        writer.Write(template.Render(tplCtx));
+
+        manifest.AddFile(CreateOutputFile($"{className}.cs", writer.ToResult(FileHeader)));
     }
 }
+
