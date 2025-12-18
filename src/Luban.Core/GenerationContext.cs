@@ -36,6 +36,7 @@ using Luban.Types;
 using Luban.TypeVisitors;
 using Luban.Utils;
 using Luban.Validator;
+using NLog;
 
 namespace Luban;
 
@@ -268,7 +269,7 @@ public class GenerationContext
                             descContent = descValue.Value;
                         }
                     }
-                    s_logger.Info("keys add {} {}, {}", keyValue.Value, descContent, hasDesc);            
+                    s_logger.Debug("keys add {} {}, {}", keyValue.Value, descContent, hasDesc);            
                     keys.Add((keyValue.Value, descContent));
                 }
             }
