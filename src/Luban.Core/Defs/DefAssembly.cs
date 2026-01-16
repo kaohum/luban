@@ -335,6 +335,38 @@ public class DefAssembly
     public TType CreateType(string module, string type, bool containerElementType)
     {
         type = DefUtil.TrimBracePairs(type);
+        
+        // 检测旧语法并抛出友好错误
+        if (type.StartsWith("(array#sep="))
+        {
+            throw new Exception($"旧的array语法已不再支持,请使用新语法,例如: int[,]");
+        }
+        if (type.StartsWith("(list#sep="))
+        {
+            throw new Exception($"旧的list语法已不再支持,请使用新语法,例如: list<int>[,]");
+        }
+        if (type.StartsWith("(set#sep="))
+        {
+            throw new Exception($"旧的set语法已不再支持,请使用新语法,例如: set<int>[,]");
+        }
+        if (type.StartsWith("(map#sep="))
+        {
+            throw new Exception($"旧的map语法已不再支持,请使用新语法,例如: map<int,string>[,]");
+        }
+        
+        // 检测新语法：包含方括号
+        if (type.Contains('['))
+        {
+            return CreateTypeFromNewBracketSyntax(module, type, containerElementType);
+        }
+        
+        // 检测新语法：包含尖括号（list/set/map）
+        if (type.Contains('<'))
+        {
+            return CreateTypeFromAngleBracketSyntax(module, type, containerElementType);
+        }
+        
+        // 旧语法：容器类型后跟逗号或分号
         int sepIndex = DefUtil.IndexOfBaseTypeEnd(type);
         if (sepIndex > 0)
         {
@@ -349,6 +381,187 @@ public class DefAssembly
         }
     }
 
+    private TType CreateTypeFromNewBracketSyntax(string module, string typeStr, bool containerElementType)
+    {
+        // 解析方括号语法
+        var (baseType, separators, hasAngleBracket) = DefUtil.ParseBracketSyntax(typeStr);
+        
+        if (separators.Count == 0)
+        {
+            // 没有方括号，不应该进入这个分支
+            return CreateType(module, typeStr, containerElementType);
+        }
+
+        // 解析baseType和tags
+        var (pureBaseType, tags) = DefUtil.ParseTypeAndVaildAttrs(baseType);
+        
+        // 如果有尖括号，说明是list/set/map类型
+        if (hasAngleBracket)
+        {
+            var (containerName, angleBracketContent, remaining) = DefUtil.ExtractAngleBracketContent(pureBaseType);
+            
+            switch (containerName.ToLower())
+            {
+                case "list":
+                    return CreateListFromNewSyntax(module, angleBracketContent, separators, tags);
+                case "set":
+                    return CreateSetFromNewSyntax(module, angleBracketContent, separators, tags);
+                case "map":
+                    return CreateMapFromNewSyntax(module, angleBracketContent, separators, tags);
+                default:
+                    throw new Exception($"不支持的容器类型: {containerName}");
+            }
+        }
+        else
+        {
+            // 纯数组类型，如 int[,] 或 int[;][,]
+            return CreateArrayFromNewSyntax(module, pureBaseType, separators, tags);
+        }
+    }
+
+    private TType CreateTypeFromAngleBracketSyntax(string module, string typeStr, bool containerElementType)
+    {
+        // 只有尖括号没有方括号的情况，可能是不完整的语法
+        var (containerName, angleBracketContent, remaining) = DefUtil.ExtractAngleBracketContent(typeStr);
+        
+        // 检查是否缺少方括号
+        if (!remaining.Contains('['))
+        {
+            throw new Exception($"{containerName}类型必须指定分隔符: {containerName}<{angleBracketContent}>[sep]");
+        }
+        
+        // 有方括号，继续用方括号语法处理
+        return CreateTypeFromNewBracketSyntax(module, typeStr, containerElementType);
+    }
+
+    private TType CreateArrayFromNewSyntax(string module, string elementTypeStr, List<string> separators, Dictionary<string, string> tags)
+    {
+        // 从最内层开始递归创建数组
+        // 例如 int[;][,] 应该创建 array<sep=;>(array<sep=,>(int))
+        
+        if (separators.Count == 0)
+        {
+            throw new Exception($"数组必须指定至少一个分隔符");
+        }
+
+        // 最内层元素类型
+        TType elementType = CreateType(module, elementTypeStr, true);
+        
+        // 从最后一个分隔符开始，逐层包装
+        for (int i = separators.Count - 1; i >= 0; i--)
+        {
+            var containerTags = new Dictionary<string, string>();
+            if (i == 0 && tags != null)
+            {
+                // 最外层添加用户指定的tags
+                containerTags = new Dictionary<string, string>(tags);
+            }
+            containerTags["sep"] = separators[i];
+            
+            elementType = TArray.Create(false, containerTags, elementType);
+        }
+        
+        return elementType;
+    }
+
+    private TType CreateListFromNewSyntax(string module, string elementTypeStr, List<string> separators, Dictionary<string, string> tags)
+    {
+        if (separators.Count == 0)
+        {
+            throw new Exception($"list类型必须指定分隔符: list<{elementTypeStr}>[sep]");
+        }
+        
+        if (separators.Count > 1)
+        {
+            // list嵌套在array中：list<T>[sep1][sep2]
+            // 应该创建：array<sep=sep2>(list<sep=sep1>(T))
+            var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
+            containerTags["sep"] = separators[0];
+            
+            TType listType = TList.Create(false, containerTags, CreateType(module, elementTypeStr, true), true);
+            
+            // 外层用array包装
+            return CreateArrayFromNewSyntax(module, "", separators.Skip(1).ToList(), tags) switch
+            {
+                TArray arr => TArray.Create(false, arr.Tags, listType),
+                _ => throw new Exception("内部错误: 期望array类型")
+            };
+        }
+        else
+        {
+            // 简单的list: list<T>[sep]
+            var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
+            containerTags["sep"] = separators[0];
+            return TList.Create(false, containerTags, CreateType(module, elementTypeStr, true), true);
+        }
+    }
+
+    private TType CreateSetFromNewSyntax(string module, string elementTypeStr, List<string> separators, Dictionary<string, string> tags)
+    {
+        if (separators.Count == 0)
+        {
+            throw new Exception($"set类型必须指定分隔符: set<{elementTypeStr}>[sep]");
+        }
+        
+        if (separators.Count > 1)
+        {
+            throw new Exception($"set类型只支持一个分隔符,不支持多维: set<{elementTypeStr}>[{separators[0]}]");
+        }
+        
+        var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
+        containerTags["sep"] = separators[0];
+        
+        TType elementType = CreateType(module, elementTypeStr, true);
+        if (elementType.IsCollection)
+        {
+            throw new Exception($"set的元素不支持容器类型");
+        }
+        
+        return TSet.Create(false, containerTags, elementType, false);
+    }
+
+    private TType CreateMapFromNewSyntax(string module, string keyValueTypeStr, List<string> separators, Dictionary<string, string> tags)
+    {
+        if (separators.Count == 0)
+        {
+            throw new Exception($"map类型必须指定entry分隔符: map<{keyValueTypeStr}>[sep]");
+        }
+        
+        if (separators.Count > 1)
+        {
+            // map嵌套在array中
+            var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
+            containerTags["sep"] = separators[0];
+            
+            var (keyType, valueType) = DefUtil.SplitMapKeyValueType(keyValueTypeStr);
+            TType mapType = TMap.Create(false, containerTags, 
+                CreateType(module, keyType, true),
+                CreateType(module, valueType, true),
+                false);
+            
+            // 外层用array包装
+            var remainingSeps = separators.Skip(1).ToList();
+            TType outerType = mapType;
+            foreach (var sep in remainingSeps)
+            {
+                var outerTags = new Dictionary<string, string> { ["sep"] = sep };
+                outerType = TArray.Create(false, outerTags, outerType);
+            }
+            return outerType;
+        }
+        else
+        {
+            var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
+            containerTags["sep"] = separators[0];
+            
+            var (keyType, valueType) = DefUtil.SplitMapKeyValueType(keyValueTypeStr);
+            return TMap.Create(false, containerTags,
+                CreateType(module, keyType, true),
+                CreateType(module, valueType, true),
+                false);
+        }
+    }
+
     protected TType CreateNotContainerType(string module, string rawType, bool containerElementType)
     {
         bool defaultAble = true;
@@ -356,6 +569,13 @@ public class DefAssembly
         // 去掉 rawType 两侧的匹配的 ()
         rawType = DefUtil.TrimBracePairs(rawType);
         var (type, tags) = DefUtil.ParseTypeAndVaildAttrs(rawType);
+
+        // 检测是否是list/set/map但缺少尖括号
+        string lowerType = type.ToLower();
+        if (lowerType == "list" || lowerType == "set" || lowerType == "map")
+        {
+            throw new Exception($"{lowerType}类型必须指定元素类型: {lowerType}<T>[sep]");
+        }
 
         while (true)
         {

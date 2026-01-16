@@ -334,6 +334,190 @@ public static class DefUtil
         return s.Split(',', ';').Select(x => x.Trim()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
     }
 
+    /// <summary>
+    /// 提取尖括号内的内容
+    /// </summary>
+    /// <param name="typeStr">类型字符串，如 "list<int>" 或 "map<int,string>"</param>
+    /// <returns>(容器名, 尖括号内容, 剩余部分)</returns>
+    public static (string containerName, string angleBracketContent, string remaining) ExtractAngleBracketContent(string typeStr)
+    {
+        int angleStart = typeStr.IndexOf('<');
+        if (angleStart < 0)
+        {
+            return (typeStr, null, "");
+        }
+
+        string containerName = typeStr.Substring(0, angleStart).Trim();
+        
+        // 找到匹配的右尖括号
+        int braceDepth = 0;
+        int angleEnd = -1;
+        for (int i = angleStart; i < typeStr.Length; i++)
+        {
+            char c = typeStr[i];
+            if (c == '<')
+            {
+                braceDepth++;
+            }
+            else if (c == '>')
+            {
+                braceDepth--;
+                if (braceDepth == 0)
+                {
+                    angleEnd = i;
+                    break;
+                }
+            }
+        }
+
+        if (angleEnd < 0)
+        {
+            throw new Exception($"类型语法错误: 尖括号不匹配 '{typeStr}'");
+        }
+
+        string content = typeStr.Substring(angleStart + 1, angleEnd - angleStart - 1).Trim();
+        string remaining = angleEnd + 1 < typeStr.Length ? typeStr.Substring(angleEnd + 1) : "";
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            throw new Exception($"{containerName}元素类型不能为空: {containerName}<T>");
+        }
+
+        return (containerName, content, remaining);
+    }
+
+    /// <summary>
+    /// 分割map的key和value类型
+    /// </summary>
+    /// <param name="kvStr">key,value类型字符串，如 "int,string" 或 "int,list<string>"</param>
+    /// <returns>(keyType, valueType)</returns>
+    public static (string keyType, string valueType) SplitMapKeyValueType(string kvStr)
+    {
+        int braceDepth = 0;
+        int angleBraceDepth = 0;
+        bool hasColon = false;
+        
+        for (int i = 0; i < kvStr.Length; i++)
+        {
+            char c = kvStr[i];
+            if (c == '(' || c == '[' || c == '{')
+            {
+                braceDepth++;
+            }
+            else if (c == ')' || c == ']' || c == '}')
+            {
+                braceDepth--;
+            }
+            else if (c == '<')
+            {
+                angleBraceDepth++;
+            }
+            else if (c == '>')
+            {
+                angleBraceDepth--;
+            }
+            else if (c == ':' && braceDepth == 0 && angleBraceDepth == 0)
+            {
+                hasColon = true;
+            }
+            else if (c == ',' && braceDepth == 0 && angleBraceDepth == 0)
+            {
+                string keyType = kvStr.Substring(0, i).Trim();
+                string valueType = kvStr.Substring(i + 1).Trim();
+
+                if (string.IsNullOrWhiteSpace(keyType) || string.IsNullOrWhiteSpace(valueType))
+                {
+                    throw new Exception($"map的key和value类型不能为空");
+                }
+
+                return (keyType, valueType);
+            }
+        }
+
+        // 如果有冒号，提示用户使用逗号
+        if (hasColon)
+        {
+            throw new Exception($"map的key和value类型必须用逗号分隔,不能使用冒号: map<K,V>[sep]");
+        }
+
+        throw new Exception($"map类型必须指定key和value类型,用逗号分隔: map<K,V>[sep]");
+    }
+
+    /// <summary>
+    /// 解析新的方括号语法
+    /// </summary>
+    /// <param name="typeStr">类型字符串，如 "int[,]" 或 "list<int>[;]"</param>
+    /// <returns>(baseType, separators, hasAngleBracket) - 基础类型、分隔符列表、是否包含尖括号</returns>
+    public static (string baseType, List<string> separators, bool hasAngleBracket) ParseBracketSyntax(string typeStr)
+    {
+        var separators = new List<string>();
+        bool hasAngleBracket = typeStr.Contains('<');
+        
+        // 提取所有方括号及其内容
+        int currentPos = 0;
+        string baseType = "";
+        
+        while (currentPos < typeStr.Length)
+        {
+            int bracketStart = typeStr.IndexOf('[', currentPos);
+            if (bracketStart < 0)
+            {
+                // 没有更多方括号了
+                if (currentPos == 0)
+                {
+                    // 完全没有方括号，不是新语法
+                    return (typeStr, separators, hasAngleBracket);
+                }
+                break;
+            }
+
+            // 记录基础类型(第一个方括号之前的内容)
+            if (currentPos == 0)
+            {
+                baseType = typeStr.Substring(0, bracketStart);
+            }
+
+            // 找到匹配的右方括号
+            int bracketEnd = typeStr.IndexOf(']', bracketStart);
+            if (bracketEnd < 0)
+            {
+                throw new Exception($"类型语法错误: 方括号不匹配 '{typeStr}'");
+            }
+
+            // 提取分隔符
+            string sep = typeStr.Substring(bracketStart + 1, bracketEnd - bracketStart - 1);
+            
+            // 检查空方括号
+            if (string.IsNullOrEmpty(sep))
+            {
+                throw new Exception($"分隔符不能为空,请显式指定分隔符,例如: {(hasAngleBracket ? baseType : typeStr.Substring(0, bracketStart))}[,]");
+            }
+
+            // 检查分隔符是否为单个字符
+            if (sep.Length > 1)
+            {
+                throw new Exception($"分隔符必须是单个字符,多维数组请使用多个方括号,例如: {baseType}[{sep[0]}][{sep[1]}]");
+            }
+
+            // 检查中文逗号
+            if (sep == "，")
+            {
+                throw new Exception($"不支持中文逗号,请使用英文逗号: {baseType}[,]");
+            }
+
+            // 警告空白字符
+            if (char.IsWhiteSpace(sep[0]))
+            {
+                throw new Exception($"不建议使用空白字符作为分隔符");
+            }
+
+            separators.Add(sep);
+            currentPos = bracketEnd + 1;
+        }
+
+        return (baseType, separators, hasAngleBracket);
+    }
+
     // public static string EscapeCommentByCurrentLanguage(string comment)
     // {
     //     var curLan = DefAssembly.LocalAssebmly.CurrentLanguage;
