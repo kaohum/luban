@@ -427,7 +427,7 @@ public class DefAssembly
         // 检查是否缺少方括号
         if (!remaining.Contains('['))
         {
-            throw new Exception($"{containerName}类型必须指定分隔符: {containerName}<{angleBracketContent}>[sep]");
+            throw new Exception($"{containerName}类型必须指定方括号: {containerName}<{angleBracketContent}>[sep] 或 {containerName}<{angleBracketContent}>[] (跨列读取)");
         }
         
         // 有方括号，继续用方括号语法处理
@@ -438,10 +438,11 @@ public class DefAssembly
     {
         // 从最内层开始递归创建数组
         // 例如 int[;][,] 应该创建 array<sep=;>(array<sep=,>(int))
+        // 空方括号[] 表示跨列读取模式，不设置sep tag
         
         if (separators.Count == 0)
         {
-            throw new Exception($"数组必须指定至少一个分隔符");
+            throw new Exception($"数组必须指定至少一个方括号");
         }
 
         // 最内层元素类型
@@ -456,7 +457,13 @@ public class DefAssembly
                 // 最外层添加用户指定的tags
                 containerTags = new Dictionary<string, string>(tags);
             }
-            containerTags["sep"] = separators[i];
+            
+            // 只有非空分隔符才添加sep tag
+            // 空字符串表示跨列读取模式，不需要sep
+            if (!string.IsNullOrEmpty(separators[i]))
+            {
+                containerTags["sep"] = separators[i];
+            }
             
             elementType = TArray.Create(false, containerTags, elementType);
         }
@@ -471,12 +478,18 @@ public class DefAssembly
             throw new Exception($"list类型必须指定分隔符: list<{elementTypeStr}>[sep]");
         }
         
+        // list也支持空方括号表示跨列读取
         if (separators.Count > 1)
         {
             // list嵌套在array中：list<T>[sep1][sep2]
             // 应该创建：array<sep=sep2>(list<sep=sep1>(T))
             var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
-            containerTags["sep"] = separators[0];
+            
+            // 只有非空分隔符才添加sep tag
+            if (!string.IsNullOrEmpty(separators[0]))
+            {
+                containerTags["sep"] = separators[0];
+            }
             
             TType listType = TList.Create(false, containerTags, CreateType(module, elementTypeStr, true), true);
             
@@ -489,9 +502,15 @@ public class DefAssembly
         }
         else
         {
-            // 简单的list: list<T>[sep]
+            // 简单的list: list<T>[sep] 或 list<T>[] (跨列读取)
             var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
-            containerTags["sep"] = separators[0];
+            
+            // 只有非空分隔符才添加sep tag
+            if (!string.IsNullOrEmpty(separators[0]))
+            {
+                containerTags["sep"] = separators[0];
+            }
+            
             return TList.Create(false, containerTags, CreateType(module, elementTypeStr, true), true);
         }
     }
@@ -500,16 +519,21 @@ public class DefAssembly
     {
         if (separators.Count == 0)
         {
-            throw new Exception($"set类型必须指定分隔符: set<{elementTypeStr}>[sep]");
+            throw new Exception($"set类型必须指定方括号: set<{elementTypeStr}>[sep] 或 set<{elementTypeStr}>[]");
         }
         
         if (separators.Count > 1)
         {
-            throw new Exception($"set类型只支持一个分隔符,不支持多维: set<{elementTypeStr}>[{separators[0]}]");
+            throw new Exception($"set类型只支持一个方括号,不支持多维: set<{elementTypeStr}>[{separators[0]}]");
         }
         
         var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
-        containerTags["sep"] = separators[0];
+        
+        // 只有非空分隔符才添加sep tag
+        if (!string.IsNullOrEmpty(separators[0]))
+        {
+            containerTags["sep"] = separators[0];
+        }
         
         TType elementType = CreateType(module, elementTypeStr, true);
         if (elementType.IsCollection)
@@ -524,14 +548,19 @@ public class DefAssembly
     {
         if (separators.Count == 0)
         {
-            throw new Exception($"map类型必须指定entry分隔符: map<{keyValueTypeStr}>[sep]");
+            throw new Exception($"map类型必须指定方括号: map<{keyValueTypeStr}>[sep] 或 map<{keyValueTypeStr}>[]");
         }
         
         if (separators.Count > 1)
         {
             // map嵌套在array中
             var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
-            containerTags["sep"] = separators[0];
+            
+            // 只有非空分隔符才添加sep tag
+            if (!string.IsNullOrEmpty(separators[0]))
+            {
+                containerTags["sep"] = separators[0];
+            }
             
             var (keyType, valueType) = DefUtil.SplitMapKeyValueType(keyValueTypeStr);
             TType mapType = TMap.Create(false, containerTags, 
@@ -544,7 +573,14 @@ public class DefAssembly
             TType outerType = mapType;
             foreach (var sep in remainingSeps)
             {
-                var outerTags = new Dictionary<string, string> { ["sep"] = sep };
+                var outerTags = new Dictionary<string, string>();
+                
+                // 只有非空分隔符才添加sep tag
+                if (!string.IsNullOrEmpty(sep))
+                {
+                    outerTags["sep"] = sep;
+                }
+                
                 outerType = TArray.Create(false, outerTags, outerType);
             }
             return outerType;
@@ -552,7 +588,12 @@ public class DefAssembly
         else
         {
             var containerTags = new Dictionary<string, string>(tags ?? new Dictionary<string, string>());
-            containerTags["sep"] = separators[0];
+            
+            // 只有非空分隔符才添加sep tag
+            if (!string.IsNullOrEmpty(separators[0]))
+            {
+                containerTags["sep"] = separators[0];
+            }
             
             var (keyType, valueType) = DefUtil.SplitMapKeyValueType(keyValueTypeStr);
             return TMap.Create(false, containerTags,

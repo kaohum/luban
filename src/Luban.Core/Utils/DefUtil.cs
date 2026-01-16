@@ -487,31 +487,33 @@ public static class DefUtil
             // 提取分隔符
             string sep = typeStr.Substring(bracketStart + 1, bracketEnd - bracketStart - 1);
             
-            // 检查空方括号
+            // 空方括号表示跨列读取模式（每列一个元素），是合法的
             if (string.IsNullOrEmpty(sep))
             {
-                throw new Exception($"分隔符不能为空,请显式指定分隔符,例如: {(hasAngleBracket ? baseType : typeStr.Substring(0, bracketStart))}[,]");
+                separators.Add("");  // 空字符串表示跨列读取
             }
-
-            // 检查分隔符是否为单个字符
-            if (sep.Length > 1)
+            else
             {
-                throw new Exception($"分隔符必须是单个字符,多维数组请使用多个方括号,例如: {baseType}[{sep[0]}][{sep[1]}]");
-            }
+                // 检查分隔符是否为单个字符
+                if (sep.Length > 1)
+                {
+                    throw new Exception($"分隔符必须是单个字符,多维数组请使用多个方括号,例如: {baseType}[{sep[0]}][{sep[1]}]");
+                }
 
-            // 检查中文逗号
-            if (sep == "，")
-            {
-                throw new Exception($"不支持中文逗号,请使用英文逗号: {baseType}[,]");
-            }
+                // 检查中文逗号
+                if (sep == "，")
+                {
+                    throw new Exception($"不支持中文逗号,请使用英文逗号: {baseType}[,]");
+                }
 
-            // 警告空白字符
-            if (char.IsWhiteSpace(sep[0]))
-            {
-                throw new Exception($"不建议使用空白字符作为分隔符");
-            }
+                // 警告空白字符
+                if (char.IsWhiteSpace(sep[0]))
+                {
+                    throw new Exception($"不建议使用空白字符作为分隔符");
+                }
 
-            separators.Add(sep);
+                separators.Add(sep);
+            }
             currentPos = bracketEnd + 1;
         }
 
