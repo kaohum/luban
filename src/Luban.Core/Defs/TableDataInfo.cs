@@ -271,19 +271,29 @@ public class TableDataInfo
                         }
                         else
                         {
-                            foreach (var existed in list)
-                            {
-                                if (HasSameTag(existed, r))
-                                {
-                                    throw new Exception($@"配置表 '{table.FullName}' 主文件 主键字段:'{indexInfo.IndexName}' 主键值:'{key}' 重复.
-        记录1 来自文件:{existed.Source}
-        记录2 来自文件:{r.Source}
-");
-                                }
-                            }
+//                             foreach (var existed in list)
+//                             {
+//                                 if (HasSameTag(existed, r))
+//                                 {
+//                                     throw new Exception($@"配置表 '{table.FullName}' 主文件 主键字段:'{indexInfo.IndexName}' 主键值:'{key}' 重复.
+//         记录1 来自文件:{existed.Source}
+//         记录2 来自文件:{r.Source}
+// ");
+//                                 }
+//                             }
                         }
                         list.Add(r);
                         recordMap[key] = r;
+                    }
+                    
+                    // 检测是否为多值索引（是否有重复的key）
+                    foreach (var kvp in recordsByKey)
+                    {
+                        if (kvp.Value.Count > 1)
+                        {
+                            indexInfo.IsMultiValue = true;
+                            break;
+                        }
                     }
                     
                     recordMapByIndexs.Add(indexInfo.IndexName, recordMap);

@@ -31,6 +31,9 @@ public record class IndexInfo(List<DefField> IndexFields, List<int> IndexFieldId
     // 是否为组合索引
     public bool IsUnionIndex => IndexFields.Count > 1;
     
+    // 是否为多值索引（一个key对应多个value）
+    public bool IsMultiValue { get; set; } = false;
+    
     // 主索引字段（第一个字段）
     public DefField PrimaryIndexField => IndexFields[0];
     
