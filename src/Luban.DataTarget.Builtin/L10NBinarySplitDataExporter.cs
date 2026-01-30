@@ -80,13 +80,36 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         return Path.Combine(lang, fileName);
     }
 
-    private static byte[] SerializeDictionaryToBinary(Dictionary<string, string> dict)
+    private static bool IsValidKeyType(TType type)
+    {
+        return type is TString || type is TInt || type is TLong || type is TShort || type is TByte;
+    }
+
+    private static object GetKeyValue(DType data)
+    {
+        return data.GetValueObject();
+    }
+
+    private static void WriteKey(ByteBuf buf, object key, TType type)
+    {
+        switch (type)
+        {
+            case TString: buf.WriteString((string)key); break;
+            case TInt: buf.WriteInt((int)key); break;
+            case TLong: buf.WriteLong((long)key); break;
+            case TShort: buf.WriteShort((short)key); break;
+            case TByte: buf.WriteByte((byte)key); break;
+            default: throw new NotSupportedException($"Unsupported key type: {type.GetType().Name}");
+        }
+    }
+
+    private static byte[] SerializeDictionaryToBinary(Dictionary<object, string> dict, TType keyType)
     {
         var buf = new ByteBuf();
         buf.WriteSize(dict.Count);
         foreach (var kv in dict)
         {
-            buf.WriteString(kv.Key);
+            WriteKey(buf, kv.Key, keyType);
             buf.WriteString(kv.Value ?? string.Empty);
         }
         return buf.CopyData();
@@ -102,7 +125,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
 
         var bean = tbean.DefBean;
         var keyField = FindField(bean, keyFieldName);
-        if (keyField == null || keyField.CType is not TString)
+        if (keyField == null || !IsValidKeyType(keyField.CType))
         {
             return;
         }
@@ -126,19 +149,21 @@ public class L10NBinarySplitDataExporter : DataExporterBase
 
         foreach (var langField in languageFields)
         {
-            var map = new Dictionary<string, string>();
+            var map = new Dictionary<object, string>();
 
             foreach (var (_, data) in beanRecords)
             {
-                var keyValue = data.GetField(keyFieldName) as DString;
+                var dKey = data.GetField(keyFieldName);
                 var langValue = data.GetField(langField.Name) as DString;
-                if (keyValue == null)
+                
+                object key = GetKeyValue(dKey);
+                if (key == null)
                 {
                     continue;
                 }
-
-                string key = keyValue.Value;
-                if (string.IsNullOrEmpty(key))
+                
+                // For string keys, check empty
+                if (key is string s && string.IsNullOrEmpty(s))
                 {
                     continue;
                 }
@@ -152,7 +177,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
                 continue;
             }
 
-            byte[] bytes = SerializeDictionaryToBinary(map);
+            byte[] bytes = SerializeDictionaryToBinary(map, keyField.CType);
             string path = BuildLanguageFilePath(langField.Name, table);
 
             manifest.AddFile(new OutputFile

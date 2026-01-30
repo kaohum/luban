@@ -208,23 +208,24 @@ public class GenerationContext
         ExportEnums = ExportTypes.OfType<DefEnum>().ToList();
     }
 
-    public IReadOnlyList<L10NKeyInfo> GetL10NKeyInfos()
+    public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos()
     {
         if (_l10nKeyInfos != null)
         {
-            return _l10nKeyInfos;
+            return (_l10nKeyInfos, typeof(int));
         }
 
         if (!DatasLoaded || L10NLanguages.Count == 0)
         {
-            return Array.Empty<L10NKeyInfo>();
+            return (Array.Empty<L10NKeyInfo>(), typeof(int));
         }
 
         var keyFieldName = L10NTextKeyFieldName;
         var keyFieldDesc = L10NTextKeyFieldDesc;
         var langSet = new HashSet<string>(L10NLanguages, StringComparer.Ordinal);
-        var keys = new List<(string, string)>();
-        var keySet = new HashSet<string>(StringComparer.Ordinal);
+        var keys = new List<(object, string)>();
+        var keySet = new HashSet<object>();
+        System.Type keyType = null;
 
         foreach (var table in ExportTables)
         {
@@ -234,7 +235,7 @@ public class GenerationContext
             }
 
             var bean = tbean.DefBean;
-            if (!HasStringField(bean, keyFieldName) || !HasAnyLanguageField(bean, langSet))
+            if (!HasAnyLanguageField(bean, langSet))
             {
                 continue;
             }
@@ -252,13 +253,17 @@ public class GenerationContext
                 {
                     continue;
                 }
-                var keyValue = data.GetField(keyFieldName) as DString;
-                if (keyValue == null || string.IsNullOrEmpty(keyValue.Value))
+                var keyValue = data.GetField(keyFieldName);
+                if (keyType == null) keyType = keyValue.GetValueObject().GetType();
+                if (keyValue is DString stringValue)
                 {
-                    continue;
+                    if (string.IsNullOrEmpty(stringValue.Value))
+                    {
+                        continue;
+                    }
                 }
 
-                if (keySet.Add(keyValue.Value))
+                if (keySet.Add(keyValue.GetValueObject()))
                 {
                     var descContent = string.Empty;
                     if (hasDesc)
@@ -268,16 +273,15 @@ public class GenerationContext
                         {
                             descContent = descValue.Value;
                         }
-                    }
-                    s_logger.Debug("keys add {} {}, {}", keyValue.Value, descContent, hasDesc);            
-                    keys.Add((keyValue.Value, descContent));
+                    }        
+                    keys.Add((keyValue.GetValueObject(), descContent));
                 }
             }
         }
 
         //keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));
         _l10nKeyInfos = BuildL10NKeyInfos(keys);
-        return _l10nKeyInfos;
+        return (_l10nKeyInfos, keyType);
     }
 
     private void AddChildrenByOrder(List<DefBean> list, DefBean bean)
@@ -331,7 +335,7 @@ public class GenerationContext
         return false;
     }
 
-    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<(string, string)> keys)
+    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<(object, string)> keys)
     {
         var result = new List<L10NKeyInfo>();
         var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -348,15 +352,16 @@ public class GenerationContext
             {
                 nameCount[fieldName] = 1;
             }
+            s_logger.Debug("keys add {}, {}, {}", key.Item1, fieldName, key.Item2);    
             result.Add(new L10NKeyInfo(key.Item1, fieldName, key.Item2));
         }
         return result;
     }
 
-    private static string MakeIdentifier(string key)
+    private static string MakeIdentifier(object key)
     {
         var sb = new StringBuilder();
-        foreach (char ch in key)
+        foreach (char ch in key.ToString())
         {
             sb.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
         }

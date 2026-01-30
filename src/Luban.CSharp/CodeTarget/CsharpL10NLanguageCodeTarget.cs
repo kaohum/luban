@@ -33,7 +33,12 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
         // 确保可访问数据
         ctx.LoadDatas();
         var keys = ctx.GetL10NKeyInfos();
-
+        var keyType = keys.Item2;
+        if (keyType == null)
+        {
+            keyType = typeof(int);
+        }
+        
         var template = GetTemplate("language");
         var tplCtx = CreateTemplateContext(template);
 
@@ -45,7 +50,8 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
             { "__ctx", ctx },
             { "__namespace", ns },
             { "__class_name", className },
-            { "__keys", keys },
+            { "__keys", keys.Item1 },
+            { "__key_type", keyType.Name },
         };
         tplCtx.PushGlobal(extra);
 

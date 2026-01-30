@@ -60,6 +60,11 @@ public abstract class DType : System.IComparable<DType>
     {
         throw new System.NotSupportedException();
     }
+
+    public virtual object GetValueObject()
+    {
+        return null;
+    }
 }
 
 public abstract class DType<T> : DType
@@ -69,5 +74,10 @@ public abstract class DType<T> : DType
     protected DType(T value)
     {
         Value = value;
+    }
+
+    public override object GetValueObject()
+    {
+        return Value;
     }
 }
