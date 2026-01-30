@@ -425,8 +425,17 @@ public class GenerationContext
         _recordsByTables[table.FullName] = tableDataInfo;
 
         // 统计各 tag 实际有数据的表列表，供模板使用
+        // 只有当表的 Group 符合当前 Target 的 Group 时，才将其加入 _tablesByTag
         if (AllTags != null && AllTags.Count > 0 && tableDataInfo.FinalRecords != null && tableDataInfo.FinalRecords.Count > 0)
         {
+            // 检查表是否应该被当前 Target 导出（根据 Group 过滤）
+            bool shouldExport = Assembly.NeedExport(table.Groups, GlobalConf.Groups);
+            if (!shouldExport)
+            {
+                s_logger.Debug("AddDataTable Skip table {} (Group mismatch with Target Groups: {})", table.FullName, string.Join(",", Target.Groups));
+                return;
+            }
+
             // 预先构建一个 HashSet，加速包含判断
             var allTagSet = new HashSet<string>(AllTags, StringComparer.OrdinalIgnoreCase);
 
