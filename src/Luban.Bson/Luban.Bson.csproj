@@ -14,4 +14,8 @@
       <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.3" />
     </ItemGroup>
 
+    <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+      <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.Bson.dll D:\work\slg\common\config\Tools\Luban" />
+    </Target>
+
 </Project>

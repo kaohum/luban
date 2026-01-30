@@ -29,4 +29,8 @@
     </None>
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.Dart.dll D:\work\slg\common\config\Tools\Luban" />
+  </Target>
+
 </Project>
