@@ -1,5 +1,63 @@
 ## 变更日志
 
+### 2026-02-02
+
+- **支持 CSV 中间格式的导出**
+  - 新增 CSV 源文件导出功能，可将原始数据源（如 Excel、CSV 等）转换为标准化的 CSV 格式中间产物。
+  - 在 `BuiltinOptionNames` 中新增 `CsvSourceOutputDir` 配置项，用于指定 CSV 源文件输出目录。
+  - 新增 `CsvSourceExporter` 类，实现 CSV 源文件的收集和导出逻辑：
+    - 使用单例模式管理全局导出器实例。
+    - 通过 `ConcurrentBag` 收集来自多个数据源的 CSV 数据。
+    - 支持按源文件分组导出，自动处理字段转义和格式化。
+  - 在 `ExcelRowColumnDataSource.Load()` 方法中捕获原始数据，包括 Sheet 名称、字段名、类型、描述等元信息。
+  - 在 `DefaultPipeline.LoadDatas()` 完成后自动调用 CSV 导出。
+  - 导出的 CSV 文件格式包含：
+    - Sheet 名称标记（`## Sheet: SheetName`）
+    - 原始数据行（保留所有字段和元信息）
+    - 自动转义特殊字符（逗号、引号、换行符等）
+  - 便于在版本控制系统（如 Git）中进行数据对比和合并。
+  - 详细使用说明参见 `CSV_SOURCE_USAGE.md` 文档。
+
+### 2026-01-30
+
+- **修复 Tag 导出时 Target Group 不生效的问题**
+  - 修复在使用 Tag 过滤导出时，Target 的 Group 配置不生效的问题。
+  - 在 `GenerationContext` 中增强了 Tag 与 Group 的关联处理逻辑。
+
+- **多语言导出支持值类型（int 等）作为 Key**
+  - 扩展本地化多语言导出功能，支持使用值类型（如 int、long 等）作为本地化键。
+  - 在 `DType` 中新增值类型判断方法，用于区分引用类型和值类型。
+  - 优化 `L10NBinarySplitDataExporter` 的键类型处理逻辑，支持更灵活的键类型配置。
+  - 更新 `CsharpL10NLanguageCodeTarget`，生成的代码支持值类型键的本地化查询。
+  - 在 `GenerationContext` 和 `L10NKeyInfo` 中优化本地化键信息的处理。
+
+- **Dll 输出目录调整**
+  - 统一调整多个项目的 Dll 输出目录配置，优化构建输出结构。
+  - 涉及项目：
+    - Luban.Bson
+    - Luban.Cpp
+    - Luban.Dart
+    - Luban.Golang
+    - Luban.Lua
+    - Luban.Protobuf
+    - Luban.Schema.Builtin
+
+- **支持导出 CSV 格式比对文件**
+  - 新增 CSV 数据导出器（`CsvDataTarget`），支持将 Luban 配置表导出为 CSV 格式。
+  - 新增 `CsvDataVisitor`，实现配置数据到 CSV 格式的转换逻辑。
+  - 支持的配置选项：
+    - `delimiter`：字段分隔符，默认为逗号 `,`
+    - `header`：是否输出表头，默认为 `true`
+    - `file_encoding`：文件编码，默认为 UTF-8
+    - `output_data_extension`：输出文件扩展名，默认为 `.csv`
+  - 复杂类型格式化规则：
+    - Bean（结构体）：`{field1:value1;field2:value2}`
+    - Array/List（数组/列表）：`[value1;value2;value3]`
+    - Map（字典）：`{key1:value1;key2:value2}`
+  - 自动处理特殊字符转义，确保 CSV 格式正确性。
+  - 方便与 Excel、数据库等工具进行数据交换和对比。
+  - 详细使用说明参见 `src/Luban.DataTarget.Builtin/Csv/README.md` 文档。
+
 ### 2026-01-21
 
 - **支持多值索引自动检测**
