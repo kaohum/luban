@@ -23,6 +23,7 @@ using Luban.Datas;
 using Luban.Defs;
 using Luban.Types;
 using Luban.Utils;
+using Luban.CsvSource;
 
 namespace Luban.DataLoader.Builtin.Excel;
 
@@ -48,18 +49,54 @@ public class ExcelRowColumnDataSource : DataLoaderBase
             var sheet = new RowColumnSheet(rawUrl, sheetName, rawSheet.SheetName);
             sheet.Load(rawSheet);
             _sheets.Add(sheet);
+
+            // 导出CSV源数据 - 直接原样转换Excel格式
+            ExportCsvSource(rawUrl, rawSheet);
         }
 
         if (_sheets.Count == 0)
         {
             if (!string.IsNullOrWhiteSpace(sheetName))
             {
-                throw new Exception($"excel:‘{rawUrl}’ sheet:‘{sheetName}’ 不存在或者不是有效的单元簿(有效单元薄的A0单元格必须是##)");
+                throw new Exception($"excel:'{rawUrl}' sheet:'{sheetName}' 不存在或者不是有效的单元簿(有效单元薄的A0单元格必须是##)");
             }
             else
             {
-                throw new Exception($"excel: ‘{rawUrl}’ 不包含有效的单元薄(有效单元薄的A0单元格必须是##).");
+                throw new Exception($"excel: '{rawUrl}' 不包含有效的单元薄(有效单元薄的A0单元格必须是##).");
             }
+        }
+    }
+
+    private void ExportCsvSource(string rawUrl, RawSheet rawSheet)
+    {
+        try
+        {
+            var csvData = new CsvSourceData
+            {
+                SourceFile = rawUrl,
+                SheetName = rawSheet.SheetName
+            };
+
+            // 使用AllCells（包含所有表头行）而不是Cells（只有数据行）
+            var cellsToExport = rawSheet.AllCells ?? rawSheet.Cells;
+            
+            // 直接原样转换所有行，不做任何处理
+            foreach (var row in cellsToExport)
+            {
+                var dataRow = new List<object>();
+                foreach (var cell in row)
+                {
+                    dataRow.Add(cell.Value);
+                }
+                csvData.Rows.Add(dataRow);
+            }
+
+            CsvSourceExporter.Instance.RecordCsvSourceData(csvData);
+            s_logger.Trace("记录CSV源数据: {} sheet:{} 共{}行", rawUrl, rawSheet.SheetName, csvData.Rows.Count);
+        }
+        catch (Exception ex)
+        {
+            s_logger.Warn(ex, "导出CSV源数据失败: {}", rawUrl);
         }
     }
 

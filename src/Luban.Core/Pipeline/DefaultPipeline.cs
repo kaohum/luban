@@ -27,6 +27,7 @@ using Luban.PostProcess;
 using Luban.RawDefs;
 using Luban.Schema;
 using Luban.Validator;
+using Luban.CsvSource;
 using NLog;
 
 namespace Luban.Pipeline;
@@ -89,6 +90,23 @@ public class DefaultPipeline : IPipeline
         _genCtx.LoadDatas();
         DoValidate();
         ProcessL10N();
+        ExportCsvSource();
+    }
+
+    protected void ExportCsvSource()
+    {
+        try
+        {
+            string csvSourceOutputDir = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.CsvSourceOutputDir, true, "");
+            if (!string.IsNullOrWhiteSpace(csvSourceOutputDir))
+            {
+                CsvSourceExporter.Instance.ExportAll(csvSourceOutputDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            s_logger.Error(ex, "导出CSV源文件失败");
+        }
     }
 
     protected void DoValidate()

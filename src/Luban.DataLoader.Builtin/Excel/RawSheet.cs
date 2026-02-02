@@ -27,4 +27,9 @@ public class RawSheet
     public string SheetName { get; set; }
 
     public List<List<Cell>> Cells { get; set; }
+
+    /// <summary>
+    /// 完整的原始单元格数据，包含所有表头行（用于CSV导出）
+    /// </summary>
+    public List<List<Cell>> AllCells { get; set; }
 }

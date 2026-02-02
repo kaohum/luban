@@ -86,8 +86,14 @@ public static class SheetLoadUtil
         var cells = ParseRawSheetContent(reader, orientRow, false);
         ValidateTitles(cells);
         var title = ParseTitle(cells, reader.MergeCells, orientRow);
+        
+        // 保存完整的原始数据（包含表头）用于CSV导出
+        var allCells = new List<List<Cell>>(cells);
+        
+        // 删除表头行，只保留数据行用于导表
         cells.RemoveAll(c => IsNotDataRow(c));
-        return new RawSheet() { Title = title, SheetName = reader.Name, Cells = cells };
+        
+        return new RawSheet() { Title = title, SheetName = reader.Name, Cells = cells, AllCells = allCells };
     }
 
 
