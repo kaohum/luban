@@ -101,4 +101,29 @@ public class LuaCommentTypeVisitor : ITypeFuncVisitor<string>
     {
         return "integer";
     }
+
+    public string Accept(TDay type)
+    {
+        return "integer";
+    }
+
+    public string Accept(THour type)
+    {
+        return "integer";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "integer";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "integer";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "integer";
+    }
 }

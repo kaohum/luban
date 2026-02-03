@@ -79,6 +79,31 @@ internal class NewtonSoftJsonDeserializeVisitor : ITypeFuncVisitor<string, strin
         return $"{y} = (long){x};";
     }
 
+    public string Accept(TDay type, string x, string y, int z)
+    {
+        return $"{y} = (long){x};";
+    }
+
+    public string Accept(THour type, string x, string y, int z)
+    {
+        return $"{y} = (long){x};";
+    }
+
+    public string Accept(TMinute type, string x, string y, int z)
+    {
+        return $"{y} = (long){x};";
+    }
+
+    public string Accept(TSecond type, string x, string y, int z)
+    {
+        return $"{y} = (long){x};";
+    }
+
+    public string Accept(TMillisecond type, string x, string y, int z)
+    {
+        return $"{y} = (long){x};";
+    }
+
     public string Accept(TBean type, string x, string y, int z)
     {
         string src = $"{CSharpUtil.GetFullNameWithGlobalQualifier(type.DefBean)}.Deserialize{type.DefBean.Name}({x})";

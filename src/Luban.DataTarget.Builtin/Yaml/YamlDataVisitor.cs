@@ -93,6 +93,31 @@ public class YamlDataVisitor : IDataFuncVisitor<YamlNode>
         return ToPlainNode(type.UnixTimeOfCurrentContext().ToString());
     }
 
+    public YamlNode Accept(DDay type)
+    {
+        return ToPlainNode(type.Value.ToString());
+    }
+
+    public YamlNode Accept(DHour type)
+    {
+        return ToPlainNode(type.Value.ToString());
+    }
+
+    public YamlNode Accept(DMinute type)
+    {
+        return ToPlainNode(type.Value.ToString());
+    }
+
+    public YamlNode Accept(DSecond type)
+    {
+        return ToPlainNode(type.Value.ToString());
+    }
+
+    public YamlNode Accept(DMillisecond type)
+    {
+        return ToPlainNode(type.Value.ToString());
+    }
+
     public YamlNode Accept(DBean type)
     {
         var m = new YamlMappingNode();

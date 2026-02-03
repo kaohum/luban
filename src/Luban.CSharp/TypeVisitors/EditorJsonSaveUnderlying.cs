@@ -77,6 +77,31 @@ class EditorJsonSaveUnderlying : ITypeFuncVisitor<string, string, string, int, s
         return $"{jsonName}[\"{jsonFieldName}\"] = new JSONString({value});";
     }
 
+    public string Accept(TDay type, string jsonName, string jsonFieldName, string value, int depth)
+    {
+        return $"{jsonName}[\"{jsonFieldName}\"] = new JSONString({value});";
+    }
+
+    public string Accept(THour type, string jsonName, string jsonFieldName, string value, int depth)
+    {
+        return $"{jsonName}[\"{jsonFieldName}\"] = new JSONString({value});";
+    }
+
+    public string Accept(TMinute type, string jsonName, string jsonFieldName, string value, int depth)
+    {
+        return $"{jsonName}[\"{jsonFieldName}\"] = new JSONString({value});";
+    }
+
+    public string Accept(TSecond type, string jsonName, string jsonFieldName, string value, int depth)
+    {
+        return $"{jsonName}[\"{jsonFieldName}\"] = new JSONString({value});";
+    }
+
+    public string Accept(TMillisecond type, string jsonName, string jsonFieldName, string value, int depth)
+    {
+        return $"{jsonName}[\"{jsonFieldName}\"] = new JSONString({value});";
+    }
+
     public string Accept(TBean type, string jsonName, string jsonFieldName, string value, int depth)
     {
         return $"{{ var __bjson{depth} = new JSONObject(); {jsonName}[\"{jsonFieldName}\"] = __bjson{depth}; {type.Apply(EditorUnderlyingTypeNameVisitor.Ins)}.SaveJson{type.DefBean.Name}({value}, __bjson{depth}); }}";

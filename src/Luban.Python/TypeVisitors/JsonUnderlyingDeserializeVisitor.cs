@@ -129,6 +129,31 @@ public class JsonUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string,
 
     public string Accept(TDateTime type, string jsonVarName, string fieldName, int depth)
     {
-        return $"{fieldName} = {jsonVarName}";
+        return $"{StringUtil.RepeatSpaceAsTab(depth)}{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TDay type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{StringUtil.RepeatSpaceAsTab(depth)}{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(THour type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{StringUtil.RepeatSpaceAsTab(depth)}{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TMinute type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{StringUtil.RepeatSpaceAsTab(depth)}{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TSecond type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{StringUtil.RepeatSpaceAsTab(depth)}{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TMillisecond type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{StringUtil.RepeatSpaceAsTab(depth)}{fieldName} = {jsonVarName}";
     }
 }

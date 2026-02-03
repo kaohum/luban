@@ -80,6 +80,31 @@ public class JsonUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string,
         return $"{fieldName} = {jsonVarName}";
     }
 
+    public string Accept(TDay type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(THour type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TMinute type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TSecond type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {jsonVarName}";
+    }
+
+    public string Accept(TMillisecond type, string jsonVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {jsonVarName}";
+    }
+
     public string Accept(TBean type, string jsonVarName, string fieldName, int depth)
     {
         string fullName = JavascriptCommonTemplateExtension.FullName(type.DefBean);

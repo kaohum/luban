@@ -91,6 +91,31 @@ class DeserializeJsonUnderingVisitor : ITypeFuncVisitor<string, string, int, str
         return DeserializeNumber(type, varName, bufName, depth);
     }
 
+    public string Accept(TDay type, string varName, string bufName, int depth)
+    {
+        return DeserializeNumber(type, varName, bufName, depth);
+    }
+
+    public string Accept(THour type, string varName, string bufName, int depth)
+    {
+        return DeserializeNumber(type, varName, bufName, depth);
+    }
+
+    public string Accept(TMinute type, string varName, string bufName, int depth)
+    {
+        return DeserializeNumber(type, varName, bufName, depth);
+    }
+
+    public string Accept(TSecond type, string varName, string bufName, int depth)
+    {
+        return DeserializeNumber(type, varName, bufName, depth);
+    }
+
+    public string Accept(TMillisecond type, string varName, string bufName, int depth)
+    {
+        return DeserializeNumber(type, varName, bufName, depth);
+    }
+
     public string Accept(TBean type, string varName, string bufName, int depth)
     {
         return $"{{ var _ok_ bool; var _x_ map[string]interface{{}}; if _x_, _ok_ = {bufName}.(map[string]interface{{}}); !_ok_ {{ err = errors.New(\"{varName} error\"); return }}; if {varName}, err = {($"New{GoCommonTemplateExtension.FullName(type.DefBean)}(_x_)")}; err != nil {{ return }} }}";

@@ -101,4 +101,29 @@ public class IsDefaultValueVisitor : IDataFuncVisitor<bool>
     {
         return false;
     }
+
+    public bool Accept(DDay type)
+    {
+        return type.Value == 0;
+    }
+
+    public bool Accept(DHour type)
+    {
+        return type.Value == 0;
+    }
+
+    public bool Accept(DMinute type)
+    {
+        return type.Value == 0;
+    }
+
+    public bool Accept(DSecond type)
+    {
+        return type.Value == 0;
+    }
+
+    public bool Accept(DMillisecond type)
+    {
+        return type.Value == 0;
+    }
 }

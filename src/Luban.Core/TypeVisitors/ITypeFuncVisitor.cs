@@ -44,6 +44,16 @@ public interface ITypeFuncVisitor<TR>
 
     TR Accept(TDateTime type);
 
+    TR Accept(TDay type);
+
+    TR Accept(THour type);
+
+    TR Accept(TMinute type);
+
+    TR Accept(TSecond type);
+
+    TR Accept(TMillisecond type);
+
     TR Accept(TBean type);
 
     TR Accept(TArray type);
@@ -76,6 +86,16 @@ public interface ITypeFuncVisitor<T, TR>
     TR Accept(TString type, T x);
 
     TR Accept(TDateTime type, T x);
+
+    TR Accept(TDay type, T x);
+
+    TR Accept(THour type, T x);
+
+    TR Accept(TMinute type, T x);
+
+    TR Accept(TSecond type, T x);
+
+    TR Accept(TMillisecond type, T x);
 
     TR Accept(TBean type, T x);
 
@@ -110,6 +130,16 @@ public interface ITypeFuncVisitor<T, T2, TR>
 
     TR Accept(TDateTime type, T x, T2 y);
 
+    TR Accept(TDay type, T x, T2 y);
+
+    TR Accept(THour type, T x, T2 y);
+
+    TR Accept(TMinute type, T x, T2 y);
+
+    TR Accept(TSecond type, T x, T2 y);
+
+    TR Accept(TMillisecond type, T x, T2 y);
+
     TR Accept(TBean type, T x, T2 y);
 
     TR Accept(TArray type, T x, T2 y);
@@ -143,6 +173,16 @@ public interface ITypeFuncVisitor<T, T2, T3, TR>
 
     TR Accept(TDateTime type, T x, T2 y, T3 z);
 
+    TR Accept(TDay type, T x, T2 y, T3 z);
+
+    TR Accept(THour type, T x, T2 y, T3 z);
+
+    TR Accept(TMinute type, T x, T2 y, T3 z);
+
+    TR Accept(TSecond type, T x, T2 y, T3 z);
+
+    TR Accept(TMillisecond type, T x, T2 y, T3 z);
+
     TR Accept(TBean type, T x, T2 y, T3 z);
 
     TR Accept(TArray type, T x, T2 y, T3 z);
@@ -175,6 +215,16 @@ public interface ITypeFuncVisitor<T, T2, T3, T4, TR>
     TR Accept(TString type, T x, T2 y, T3 z, T4 w);
 
     TR Accept(TDateTime type, T x, T2 y, T3 z, T4 w);
+
+    TR Accept(TDay type, T x, T2 y, T3 z, T4 w);
+
+    TR Accept(THour type, T x, T2 y, T3 z, T4 w);
+
+    TR Accept(TMinute type, T x, T2 y, T3 z, T4 w);
+
+    TR Accept(TSecond type, T x, T2 y, T3 z, T4 w);
+
+    TR Accept(TMillisecond type, T x, T2 y, T3 z, T4 w);
 
     TR Accept(TBean type, T x, T2 y, T3 z, T4 w);
 

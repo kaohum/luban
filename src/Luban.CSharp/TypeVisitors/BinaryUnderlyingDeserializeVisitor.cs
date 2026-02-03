@@ -78,6 +78,36 @@ public class BinaryUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, strin
         return $"{fieldName} = {src};";
     }
 
+    public string Accept(TDay type, string bufName, string fieldName, int depth)
+    {
+        string src = $"{bufName}.ReadLong()";
+        return $"{fieldName} = {src};";
+    }
+
+    public string Accept(THour type, string bufName, string fieldName, int depth)
+    {
+        string src = $"{bufName}.ReadLong()";
+        return $"{fieldName} = {src};";
+    }
+
+    public string Accept(TMinute type, string bufName, string fieldName, int depth)
+    {
+        string src = $"{bufName}.ReadLong()";
+        return $"{fieldName} = {src};";
+    }
+
+    public string Accept(TSecond type, string bufName, string fieldName, int depth)
+    {
+        string src = $"{bufName}.ReadLong()";
+        return $"{fieldName} = {src};";
+    }
+
+    public string Accept(TMillisecond type, string bufName, string fieldName, int depth)
+    {
+        string src = $"{bufName}.ReadLong()";
+        return $"{fieldName} = {src};";
+    }
+
     public string Accept(TBean type, string bufName, string fieldName, int depth)
     {
         string src = $"{CSharpUtil.GetFullNameWithGlobalQualifier(type.DefBean)}.Deserialize{type.DefBean.Name}({bufName})";

@@ -78,6 +78,31 @@ public class ProtobufWireTypeVisitor : ITypeFuncVisitor<WireFormat.WireType>
         return WireFormat.WireType.Varint;
     }
 
+    public WireFormat.WireType Accept(TDay type)
+    {
+        return WireFormat.WireType.Varint;
+    }
+
+    public WireFormat.WireType Accept(THour type)
+    {
+        return WireFormat.WireType.Varint;
+    }
+
+    public WireFormat.WireType Accept(TMinute type)
+    {
+        return WireFormat.WireType.Varint;
+    }
+
+    public WireFormat.WireType Accept(TSecond type)
+    {
+        return WireFormat.WireType.Varint;
+    }
+
+    public WireFormat.WireType Accept(TMillisecond type)
+    {
+        return WireFormat.WireType.Varint;
+    }
+
     public WireFormat.WireType Accept(TBean type)
     {
         return WireFormat.WireType.LengthDelimited;

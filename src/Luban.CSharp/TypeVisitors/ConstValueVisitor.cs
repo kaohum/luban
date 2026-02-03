@@ -77,6 +77,31 @@ public class ConstValueVisitor : ITypeFuncVisitor<string, string>
         throw new NotImplementedException();
     }
 
+    public string Accept(TDay type, string x)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(THour type, string x)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TMinute type, string x)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TSecond type, string x)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TMillisecond type, string x)
+    {
+        throw new NotImplementedException();
+    }
+
     public string Accept(TBean type, string x)
     {
         throw new NotImplementedException();

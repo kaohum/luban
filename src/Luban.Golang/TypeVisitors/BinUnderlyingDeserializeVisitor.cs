@@ -78,6 +78,31 @@ public class BinUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string, 
         return $"{{ if {fieldName}, {err} = {bufName}.ReadLong(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
     }
 
+    public string Accept(TDay type, string fieldName, string bufName, string err, int depth)
+    {
+        return $"{{ if {fieldName}, {err} = {bufName}.ReadLong(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
+    }
+
+    public string Accept(THour type, string fieldName, string bufName, string err, int depth)
+    {
+        return $"{{ if {fieldName}, {err} = {bufName}.ReadLong(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
+    }
+
+    public string Accept(TMinute type, string fieldName, string bufName, string err, int depth)
+    {
+        return $"{{ if {fieldName}, {err} = {bufName}.ReadLong(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
+    }
+
+    public string Accept(TSecond type, string fieldName, string bufName, string err, int depth)
+    {
+        return $"{{ if {fieldName}, {err} = {bufName}.ReadLong(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
+    }
+
+    public string Accept(TMillisecond type, string fieldName, string bufName, string err, int depth)
+    {
+        return $"{{ if {fieldName}, {err} = {bufName}.ReadLong(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
+    }
+
     public string Accept(TBean type, string fieldName, string bufName, string err, int depth)
     {
         return $"{{ if {fieldName}, {err} = {($"New{GoCommonTemplateExtension.FullName(type.DefBean)}({bufName})")}; {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";

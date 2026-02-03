@@ -77,6 +77,31 @@ class EditorJsonSaveUnderlying2 : ITypeFuncVisitor<string, string, int, string>
         return $"{varName} = new JSONString({value});";
     }
 
+    public string Accept(TDay type, string varName, string value, int depth)
+    {
+        return $"{varName} = new JSONString({value});";
+    }
+
+    public string Accept(THour type, string varName, string value, int depth)
+    {
+        return $"{varName} = new JSONString({value});";
+    }
+
+    public string Accept(TMinute type, string varName, string value, int depth)
+    {
+        return $"{varName} = new JSONString({value});";
+    }
+
+    public string Accept(TSecond type, string varName, string value, int depth)
+    {
+        return $"{varName} = new JSONString({value});";
+    }
+
+    public string Accept(TMillisecond type, string varName, string value, int depth)
+    {
+        return $"{varName} = new JSONString({value});";
+    }
+
     public string Accept(TBean type, string varName, string value, int depth)
     {
         return $"{{ var __bjson{depth} = new JSONObject();  {varName} = __bjson{depth}; {type.Apply(EditorUnderlyingTypeNameVisitor.Ins)}.SaveJson{type.DefBean.Name}({value}, __bjson{depth}); }}";

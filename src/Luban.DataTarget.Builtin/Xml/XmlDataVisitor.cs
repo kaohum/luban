@@ -83,6 +83,31 @@ public class XmlDataVisitor : IDataActionVisitor<XmlWriter>
         w.WriteValue(type.UnixTimeOfCurrentContext());
     }
 
+    public void Accept(DDay type, XmlWriter w)
+    {
+        w.WriteValue(type.Value);
+    }
+
+    public void Accept(DHour type, XmlWriter w)
+    {
+        w.WriteValue(type.Value);
+    }
+
+    public void Accept(DMinute type, XmlWriter w)
+    {
+        w.WriteValue(type.Value);
+    }
+
+    public void Accept(DSecond type, XmlWriter w)
+    {
+        w.WriteValue(type.Value);
+    }
+
+    public void Accept(DMillisecond type, XmlWriter w)
+    {
+        w.WriteValue(type.Value);
+    }
+
     public void Accept(DBean type, XmlWriter w)
     {
         if (type.Type.IsAbstractType)

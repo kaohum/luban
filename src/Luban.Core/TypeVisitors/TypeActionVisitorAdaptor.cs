@@ -98,4 +98,29 @@ public abstract class TypeActionVisitorAdaptor<T> : ITypeActionVisitor<T>
     {
 
     }
+
+    public virtual void Accept(TDay type, T x)
+    {
+
+    }
+
+    public virtual void Accept(THour type, T x)
+    {
+
+    }
+
+    public virtual void Accept(TMinute type, T x)
+    {
+
+    }
+
+    public virtual void Accept(TSecond type, T x)
+    {
+
+    }
+
+    public virtual void Accept(TMillisecond type, T x)
+    {
+
+    }
 }

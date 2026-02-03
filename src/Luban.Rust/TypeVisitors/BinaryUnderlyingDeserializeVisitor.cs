@@ -83,6 +83,31 @@ public class BinaryUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, strin
         return $"{bufName}.read_ulong()";
     }
 
+    public string Accept(TDay type, string bufName, string fieldName, int depth)
+    {
+        return $"{bufName}.read_ulong()";
+    }
+
+    public string Accept(THour type, string bufName, string fieldName, int depth)
+    {
+        return $"{bufName}.read_ulong()";
+    }
+
+    public string Accept(TMinute type, string bufName, string fieldName, int depth)
+    {
+        return $"{bufName}.read_ulong()";
+    }
+
+    public string Accept(TSecond type, string bufName, string fieldName, int depth)
+    {
+        return $"{bufName}.read_ulong()";
+    }
+
+    public string Accept(TMillisecond type, string bufName, string fieldName, int depth)
+    {
+        return $"{bufName}.read_ulong()";
+    }
+
     public string Accept(TBean type, string bufName, string fieldName, int depth)
     {
         return type.DefBean.IsAbstractType

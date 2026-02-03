@@ -78,6 +78,31 @@ class JsonUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string, int, s
         return $"{y} = {x} as int";
     }
 
+    public string Accept(TDay type, string x, string y, int z)
+    {
+        return $"{y} = {x} as int";
+    }
+
+    public string Accept(THour type, string x, string y, int z)
+    {
+        return $"{y} = {x} as int";
+    }
+
+    public string Accept(TMinute type, string x, string y, int z)
+    {
+        return $"{y} = {x} as int";
+    }
+
+    public string Accept(TSecond type, string x, string y, int z)
+    {
+        return $"{y} = {x} as int";
+    }
+
+    public string Accept(TMillisecond type, string x, string y, int z)
+    {
+        return $"{y} = {x} as int";
+    }
+
     public string Accept(TBean type, string x, string y, int z)
     {
         return $"{y} = {type.DefBean.Name}.deserialize({x})";

@@ -677,6 +677,16 @@ public class DefAssembly
             case "time":
             case "datetime":
                 return TDateTime.Create(nullable, tags);
+            case "day":
+                return TDay.Create(nullable, tags);
+            case "hour":
+                return THour.Create(nullable, tags);
+            case "minute":
+                return TMinute.Create(nullable, tags);
+            case "second":
+                return TSecond.Create(nullable, tags);
+            case "millisecond":
+                return TMillisecond.Create(nullable, tags);
             default:
             {
                 var dtype = GetDefTType(module, type, nullable, tags);

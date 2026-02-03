@@ -248,4 +248,29 @@ class LuaDataCreator : ITypeFuncVisitor<object, DefAssembly, DType>
     {
         return DataUtil.CreateDateTime(x.ToString());
     }
+
+    public DType Accept(TDay type, object x, DefAssembly ass)
+    {
+        return DataUtil.CreateDay(x.ToString());
+    }
+
+    public DType Accept(THour type, object x, DefAssembly ass)
+    {
+        return DataUtil.CreateHour(x.ToString());
+    }
+
+    public DType Accept(TMinute type, object x, DefAssembly ass)
+    {
+        return DataUtil.CreateMinute(x.ToString());
+    }
+
+    public DType Accept(TSecond type, object x, DefAssembly ass)
+    {
+        return DataUtil.CreateSecond(x.ToString());
+    }
+
+    public DType Accept(TMillisecond type, object x, DefAssembly ass)
+    {
+        return DataUtil.CreateMillisecond(x.ToString());
+    }
 }

@@ -80,6 +80,31 @@ public class RustJsonUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, str
         return $"({json}.as_i64().unwrap() as u64)";
     }
 
+    public string Accept(TDay type, string json, string field, int depth)
+    {
+        return $"({json}.as_i64().unwrap() as u64)";
+    }
+
+    public string Accept(THour type, string json, string field, int depth)
+    {
+        return $"({json}.as_i64().unwrap() as u64)";
+    }
+
+    public string Accept(TMinute type, string json, string field, int depth)
+    {
+        return $"({json}.as_i64().unwrap() as u64)";
+    }
+
+    public string Accept(TSecond type, string json, string field, int depth)
+    {
+        return $"({json}.as_i64().unwrap() as u64)";
+    }
+
+    public string Accept(TMillisecond type, string json, string field, int depth)
+    {
+        return $"({json}.as_i64().unwrap() as u64)";
+    }
+
     public string Accept(TBean type, string json, string field, int depth)
     {
         return type.DefBean.IsAbstractType

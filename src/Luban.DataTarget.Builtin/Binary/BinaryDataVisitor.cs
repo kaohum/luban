@@ -80,6 +80,31 @@ public class BinaryDataVisitor : IDataActionVisitor<ByteBuf>
         x.WriteLong(type.UnixTimeOfCurrentContext());
     }
 
+    public void Accept(DDay type, ByteBuf x)
+    {
+        x.WriteLong(type.Value);
+    }
+
+    public void Accept(DHour type, ByteBuf x)
+    {
+        x.WriteLong(type.Value);
+    }
+
+    public void Accept(DMinute type, ByteBuf x)
+    {
+        x.WriteLong(type.Value);
+    }
+
+    public void Accept(DSecond type, ByteBuf x)
+    {
+        x.WriteLong(type.Value);
+    }
+
+    public void Accept(DMillisecond type, ByteBuf x)
+    {
+        x.WriteLong(type.Value);
+    }
+
     public void Accept(DBean type, ByteBuf x)
     {
         var bean = type.Type;

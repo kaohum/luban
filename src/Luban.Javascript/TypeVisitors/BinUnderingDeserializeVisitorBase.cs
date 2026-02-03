@@ -98,4 +98,29 @@ public abstract class BinUnderingDeserializeVisitorBase : ITypeFuncVisitor<strin
     {
         return $"{fieldName} = {bufVarName}.readLongAsNumber()";
     }
+
+    public string Accept(TDay type, string bufVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufVarName}.readLongAsNumber()";
+    }
+
+    public string Accept(THour type, string bufVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufVarName}.readLongAsNumber()";
+    }
+
+    public string Accept(TMinute type, string bufVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufVarName}.readLongAsNumber()";
+    }
+
+    public string Accept(TSecond type, string bufVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufVarName}.readLongAsNumber()";
+    }
+
+    public string Accept(TMillisecond type, string bufVarName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufVarName}.readLongAsNumber()";
+    }
 }

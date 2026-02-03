@@ -44,6 +44,16 @@ public interface IDataFuncVisitor<TR>
 
     TR Accept(DDateTime type);
 
+    TR Accept(DDay type);
+
+    TR Accept(DHour type);
+
+    TR Accept(DMinute type);
+
+    TR Accept(DSecond type);
+
+    TR Accept(DMillisecond type);
+
     TR Accept(DBean type);
 
     TR Accept(DArray type);
@@ -77,6 +87,16 @@ public interface IDataFuncVisitor<T, TR>
 
     TR Accept(DDateTime type, T x);
 
+    TR Accept(DDay type, T x);
+
+    TR Accept(DHour type, T x);
+
+    TR Accept(DMinute type, T x);
+
+    TR Accept(DSecond type, T x);
+
+    TR Accept(DMillisecond type, T x);
+
     TR Accept(DBean type, T x);
 
     TR Accept(DArray type, T x);
@@ -108,6 +128,16 @@ public interface IDataFuncVisitor<T1, T2, TR>
     TR Accept(DString type, T1 x, T2 y);
 
     TR Accept(DDateTime type, T1 x, T2 y);
+
+    TR Accept(DDay type, T1 x, T2 y);
+
+    TR Accept(DHour type, T1 x, T2 y);
+
+    TR Accept(DMinute type, T1 x, T2 y);
+
+    TR Accept(DSecond type, T1 x, T2 y);
+
+    TR Accept(DMillisecond type, T1 x, T2 y);
 
     TR Accept(DBean type, T1 x, T2 y);
 

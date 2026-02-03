@@ -78,6 +78,31 @@ public class DeclaringCollectionRefNameVisitor : ITypeFuncVisitor<string>
         throw new NotImplementedException();
     }
 
+    public string Accept(TDay type)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(THour type)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TMinute type)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TSecond type)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        throw new NotImplementedException();
+    }
+
     public string Accept(TBean type)
     {
         throw new NotImplementedException();

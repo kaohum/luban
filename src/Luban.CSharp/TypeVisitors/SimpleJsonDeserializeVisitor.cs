@@ -78,6 +78,31 @@ public class SimpleJsonDeserializeVisitor : ITypeFuncVisitor<string, string, int
         return $"{{ if(!{json}.IsNumber) {{ throw new SerializationException(); }}  {x} = {json}; }}";
     }
 
+    public string Accept(TDay type, string json, string x, int depth)
+    {
+        return $"{{ if(!{json}.IsNumber) {{ throw new SerializationException(); }}  {x} = {json}; }}";
+    }
+
+    public string Accept(THour type, string json, string x, int depth)
+    {
+        return $"{{ if(!{json}.IsNumber) {{ throw new SerializationException(); }}  {x} = {json}; }}";
+    }
+
+    public string Accept(TMinute type, string json, string x, int depth)
+    {
+        return $"{{ if(!{json}.IsNumber) {{ throw new SerializationException(); }}  {x} = {json}; }}";
+    }
+
+    public string Accept(TSecond type, string json, string x, int depth)
+    {
+        return $"{{ if(!{json}.IsNumber) {{ throw new SerializationException(); }}  {x} = {json}; }}";
+    }
+
+    public string Accept(TMillisecond type, string json, string x, int depth)
+    {
+        return $"{{ if(!{json}.IsNumber) {{ throw new SerializationException(); }}  {x} = {json}; }}";
+    }
+
     public string Accept(TBean type, string json, string x, int depth)
     {
         string src = $"{CSharpUtil.GetFullNameWithGlobalQualifier(type.DefBean)}.Deserialize{type.DefBean.Name}({json})";

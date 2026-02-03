@@ -231,6 +231,31 @@ class DeepCompareTypeDefine : ITypeFuncVisitor<TType, Dictionary<DefTypeBase, bo
         return true;
     }
 
+    public bool Accept(TDay type, TType x, Dictionary<DefTypeBase, bool> y, HashSet<DefTypeBase> z)
+    {
+        return true;
+    }
+
+    public bool Accept(THour type, TType x, Dictionary<DefTypeBase, bool> y, HashSet<DefTypeBase> z)
+    {
+        return true;
+    }
+
+    public bool Accept(TMinute type, TType x, Dictionary<DefTypeBase, bool> y, HashSet<DefTypeBase> z)
+    {
+        return true;
+    }
+
+    public bool Accept(TSecond type, TType x, Dictionary<DefTypeBase, bool> y, HashSet<DefTypeBase> z)
+    {
+        return true;
+    }
+
+    public bool Accept(TMillisecond type, TType x, Dictionary<DefTypeBase, bool> y, HashSet<DefTypeBase> z)
+    {
+        return true;
+    }
+
     public bool Accept(TBean type, TType x, Dictionary<DefTypeBase, bool> y, HashSet<DefTypeBase> z)
     {
         return Compare(type.DefBean, ((TBean)x).DefBean, y, z);

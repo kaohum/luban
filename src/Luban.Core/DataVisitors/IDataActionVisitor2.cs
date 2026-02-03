@@ -45,6 +45,16 @@ public interface IDataActionVisitor2<T>
 
     void Accept(DDateTime data, TType type, T x);
 
+    void Accept(DDay data, TType type, T x);
+
+    void Accept(DHour data, TType type, T x);
+
+    void Accept(DMinute data, TType type, T x);
+
+    void Accept(DSecond data, TType type, T x);
+
+    void Accept(DMillisecond data, TType type, T x);
+
     void Accept(DBean data, TType type, T x);
 
     void Accept(DArray data, TType type, T x);
@@ -77,6 +87,16 @@ public interface IDataActionVisitor2<T1, T2>
     void Accept(DString data, TType type, T1 x, T2 y);
 
     void Accept(DDateTime data, TType type, T1 x, T2 y);
+
+    void Accept(DDay data, TType type, T1 x, T2 y);
+
+    void Accept(DHour data, TType type, T1 x, T2 y);
+
+    void Accept(DMinute data, TType type, T1 x, T2 y);
+
+    void Accept(DSecond data, TType type, T1 x, T2 y);
+
+    void Accept(DMillisecond data, TType type, T1 x, T2 y);
 
     void Accept(DBean data, TType type, T1 x, T2 y);
 

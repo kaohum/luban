@@ -84,6 +84,31 @@ public class ResDataVisitor : IDataActionVisitor<TType, List<ResourceInfo>>
 
     }
 
+    public void Accept(DDay type, TType x, List<ResourceInfo> y)
+    {
+
+    }
+
+    public void Accept(DHour type, TType x, List<ResourceInfo> y)
+    {
+
+    }
+
+    public void Accept(DMinute type, TType x, List<ResourceInfo> y)
+    {
+
+    }
+
+    public void Accept(DSecond type, TType x, List<ResourceInfo> y)
+    {
+
+    }
+
+    public void Accept(DMillisecond type, TType x, List<ResourceInfo> y)
+    {
+
+    }
+
     public void Accept(DBean type, TType x, List<ResourceInfo> y)
     {
         var def = type.ImplType;

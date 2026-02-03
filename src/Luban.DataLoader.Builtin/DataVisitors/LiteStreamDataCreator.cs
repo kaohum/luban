@@ -184,6 +184,56 @@ class LiteStreamDataCreator : ITypeFuncVisitor<LiteStream, DType>
         return DataUtil.CreateDateTime(d);
     }
 
+    public DType Accept(TDay type, LiteStream x)
+    {
+        string d = x.ReadData();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateDay(d);
+    }
+
+    public DType Accept(THour type, LiteStream x)
+    {
+        string d = x.ReadData();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateHour(d);
+    }
+
+    public DType Accept(TMinute type, LiteStream x)
+    {
+        string d = x.ReadData();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateMinute(d);
+    }
+
+    public DType Accept(TSecond type, LiteStream x)
+    {
+        string d = x.ReadData();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateSecond(d);
+    }
+
+    public DType Accept(TMillisecond type, LiteStream x)
+    {
+        string d = x.ReadData();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateMillisecond(d);
+    }
+
     private List<DType> CreateBeanFields(DefBean bean, LiteStream stream)
     {
         var list = new List<DType>();

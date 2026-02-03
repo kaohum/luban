@@ -101,4 +101,29 @@ public class LuaDeserializeMethodNameVisitor : ITypeFuncVisitor<string>
     {
         return "readLong";
     }
+
+    public string Accept(TDay type)
+    {
+        return "readLong";
+    }
+
+    public string Accept(THour type)
+    {
+        return "readLong";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "readLong";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "readLong";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "readLong";
+    }
 }

@@ -44,6 +44,16 @@ public interface ITypeActionVisitor<T>
 
     void Accept(TDateTime type, T x);
 
+    void Accept(TDay type, T x);
+
+    void Accept(THour type, T x);
+
+    void Accept(TMinute type, T x);
+
+    void Accept(TSecond type, T x);
+
+    void Accept(TMillisecond type, T x);
+
     void Accept(TBean type, T x);
 
     void Accept(TArray type, T x);
@@ -76,6 +86,16 @@ public interface ITypeActionVisitor<T1, T2>
     void Accept(TString type, T1 x, T2 y);
 
     void Accept(TDateTime type, T1 x, T2 y);
+
+    void Accept(TDay type, T1 x, T2 y);
+
+    void Accept(THour type, T1 x, T2 y);
+
+    void Accept(TMinute type, T1 x, T2 y);
+
+    void Accept(TSecond type, T1 x, T2 y);
+
+    void Accept(TMillisecond type, T1 x, T2 y);
 
     void Accept(TBean type, T1 x, T2 y);
 

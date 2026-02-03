@@ -84,6 +84,31 @@ public class CppUnderlyingDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
         return "::luban::datetime";
     }
 
+    public string Accept(TDay type)
+    {
+        return "::luban::day";
+    }
+
+    public string Accept(THour type)
+    {
+        return "::luban::hour";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "::luban::minute";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "::luban::second";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "::luban::millisecond";
+    }
+
     public string Accept(TArray type)
     {
         return $"::luban::Array<{type.ElementType.Apply(this)}>";

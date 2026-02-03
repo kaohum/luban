@@ -59,6 +59,51 @@ public static class DataUtil
         return datetime.ToString("yyyy-M-d HH:mm:ss");
     }
 
+    public static DDay CreateDay(string x)
+    {
+        if (!long.TryParse(x, out long days))
+        {
+            throw new Exception($"{x} 不是有效的 day 类型的值");
+        }
+        return new DDay(days);
+    }
+
+    public static DHour CreateHour(string x)
+    {
+        if (!long.TryParse(x, out long hours))
+        {
+            throw new Exception($"{x} 不是有效的 hour 类型的值");
+        }
+        return new DHour(hours);
+    }
+
+    public static DMinute CreateMinute(string x)
+    {
+        if (!long.TryParse(x, out long minutes))
+        {
+            throw new Exception($"{x} 不是有效的 minute 类型的值");
+        }
+        return new DMinute(minutes);
+    }
+
+    public static DSecond CreateSecond(string x)
+    {
+        if (!long.TryParse(x, out long seconds))
+        {
+            throw new Exception($"{x} 不是有效的 second 类型的值");
+        }
+        return new DSecond(seconds);
+    }
+
+    public static DMillisecond CreateMillisecond(string x)
+    {
+        if (!long.TryParse(x, out long milliseconds))
+        {
+            throw new Exception($"{x} 不是有效的 millisecond 类型的值");
+        }
+        return new DMillisecond(milliseconds);
+    }
+
     public static byte[] StreamToBytes(Stream stream)
     {
         byte[] bytes = new byte[stream.Length];

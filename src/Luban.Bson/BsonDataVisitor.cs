@@ -81,6 +81,31 @@ public class BsonDataVisitor : IDataActionVisitor<BsonDataWriter>
         x.WriteValue(type.UnixTimeOfCurrentContext());
     }
 
+    public virtual void Accept(DDay type, BsonDataWriter x)
+    {
+        x.WriteValue(type.Value);
+    }
+
+    public virtual void Accept(DHour type, BsonDataWriter x)
+    {
+        x.WriteValue(type.Value);
+    }
+
+    public virtual void Accept(DMinute type, BsonDataWriter x)
+    {
+        x.WriteValue(type.Value);
+    }
+
+    public virtual void Accept(DSecond type, BsonDataWriter x)
+    {
+        x.WriteValue(type.Value);
+    }
+
+    public virtual void Accept(DMillisecond type, BsonDataWriter x)
+    {
+        x.WriteValue(type.Value);
+    }
+
     public virtual void Accept(DBean type, BsonDataWriter x)
     {
         x.WriteStartObject();

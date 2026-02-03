@@ -81,6 +81,31 @@ public abstract class CppUnderlyingDeserializeVisitorBase : ITypeFuncVisitor<str
         return $"if(!{bufName}.readLong({fieldName})) return false;";
     }
 
+    public string Accept(TDay type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
+    {
+        return $"if(!{bufName}.readLong({fieldName})) return false;";
+    }
+
+    public string Accept(THour type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
+    {
+        return $"if(!{bufName}.readLong({fieldName})) return false;";
+    }
+
+    public string Accept(TMinute type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
+    {
+        return $"if(!{bufName}.readLong({fieldName})) return false;";
+    }
+
+    public string Accept(TSecond type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
+    {
+        return $"if(!{bufName}.readLong({fieldName})) return false;";
+    }
+
+    public string Accept(TMillisecond type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
+    {
+        return $"if(!{bufName}.readLong({fieldName})) return false;";
+    }
+
     public string Accept(TArray type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
     {
         var suffix = depth == 0 ? "" : $"_{depth}";

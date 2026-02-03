@@ -201,6 +201,56 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
         return DataUtil.CreateDateTime(d.ToString());
     }
 
+    public DType Accept(TDay type, ExcelStream x)
+    {
+        var d = x.Read();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateDay(d.ToString());
+    }
+
+    public DType Accept(THour type, ExcelStream x)
+    {
+        var d = x.Read();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateHour(d.ToString());
+    }
+
+    public DType Accept(TMinute type, ExcelStream x)
+    {
+        var d = x.Read();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateMinute(d.ToString());
+    }
+
+    public DType Accept(TSecond type, ExcelStream x)
+    {
+        var d = x.Read();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateSecond(d.ToString());
+    }
+
+    public DType Accept(TMillisecond type, ExcelStream x)
+    {
+        var d = x.Read();
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        return DataUtil.CreateMillisecond(d.ToString());
+    }
+
     private List<DType> CreateBeanFields(DefBean bean, ExcelStream stream)
     {
         var list = new List<DType>();

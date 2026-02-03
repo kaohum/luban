@@ -83,6 +83,31 @@ class DartDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
         return type.IsNullable ? "int?" : "int";
     }
 
+    public virtual string Accept(TDay type)
+    {
+        return type.IsNullable ? "int?" : "int";
+    }
+
+    public virtual string Accept(THour type)
+    {
+        return type.IsNullable ? "int?" : "int";
+    }
+
+    public virtual string Accept(TMinute type)
+    {
+        return type.IsNullable ? "int?" : "int";
+    }
+
+    public virtual string Accept(TSecond type)
+    {
+        return type.IsNullable ? "int?" : "int";
+    }
+
+    public virtual string Accept(TMillisecond type)
+    {
+        return type.IsNullable ? "int?" : "int";
+    }
+
     public string Accept(TBean type)
     {
         var name = type.DefBean.TypeNameWithTypeMapper() ?? type.DefBean.Name;

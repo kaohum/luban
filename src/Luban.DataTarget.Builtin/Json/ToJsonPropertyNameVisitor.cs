@@ -77,6 +77,31 @@ public class ToJsonPropertyNameVisitor : IDataFuncVisitor<string>
         throw new NotSupportedException();
     }
 
+    public string Accept(DDay type)
+    {
+        return type.Value.ToString();
+    }
+
+    public string Accept(DHour type)
+    {
+        return type.Value.ToString();
+    }
+
+    public string Accept(DMinute type)
+    {
+        return type.Value.ToString();
+    }
+
+    public string Accept(DSecond type)
+    {
+        return type.Value.ToString();
+    }
+
+    public string Accept(DMillisecond type)
+    {
+        return type.Value.ToString();
+    }
+
     public string Accept(DBean type)
     {
         throw new NotSupportedException();

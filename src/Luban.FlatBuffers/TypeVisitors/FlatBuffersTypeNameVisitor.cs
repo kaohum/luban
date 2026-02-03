@@ -78,6 +78,31 @@ public class FlatBuffersTypeNameVisitor : ITypeFuncVisitor<string>
         return "int64";
     }
 
+    public string Accept(TDay type)
+    {
+        return "int64";
+    }
+
+    public string Accept(THour type)
+    {
+        return "int64";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "int64";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "int64";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "int64";
+    }
+
     public string Accept(TBean type)
     {
         return TypeUtil.MakeFlatBuffersFullName(type.DefBean.Namespace, type.DefBean.Name);

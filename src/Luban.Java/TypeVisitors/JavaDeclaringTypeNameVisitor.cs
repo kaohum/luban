@@ -79,6 +79,31 @@ public class JavaDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
         return type.IsNullable ? "Long" : "long";
     }
 
+    public virtual string Accept(TDay type)
+    {
+        return type.IsNullable ? "Long" : "long";
+    }
+
+    public virtual string Accept(THour type)
+    {
+        return type.IsNullable ? "Long" : "long";
+    }
+
+    public virtual string Accept(TMinute type)
+    {
+        return type.IsNullable ? "Long" : "long";
+    }
+
+    public virtual string Accept(TSecond type)
+    {
+        return type.IsNullable ? "Long" : "long";
+    }
+
+    public virtual string Accept(TMillisecond type)
+    {
+        return type.IsNullable ? "Long" : "long";
+    }
+
     public string Accept(TBean type)
     {
         return type.DefBean.TypeNameWithTypeMapper() ?? type.DefBean.FullNameWithTopModule;

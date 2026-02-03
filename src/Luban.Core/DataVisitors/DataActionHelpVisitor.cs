@@ -87,6 +87,31 @@ public class DataActionHelpVisitor<T> : IDataActionVisitor<T>
         _underlyingVisitor.Accept(type, x);
     }
 
+    public void Accept(DDay type, T x)
+    {
+        _underlyingVisitor.Accept(type, x);
+    }
+
+    public void Accept(DHour type, T x)
+    {
+        _underlyingVisitor.Accept(type, x);
+    }
+
+    public void Accept(DMinute type, T x)
+    {
+        _underlyingVisitor.Accept(type, x);
+    }
+
+    public void Accept(DSecond type, T x)
+    {
+        _underlyingVisitor.Accept(type, x);
+    }
+
+    public void Accept(DMillisecond type, T x)
+    {
+        _underlyingVisitor.Accept(type, x);
+    }
+
     public void Accept(DBean type, T x)
     {
         _underlyingVisitor.Accept(type, x);
@@ -199,6 +224,31 @@ public class DataActionHelpVisitor<T1, T2> : IDataActionVisitor<T1, T2>
     }
 
     public void Accept(DDateTime type, T1 x, T2 y)
+    {
+        _underlyingVisitor.Accept(type, x, y);
+    }
+
+    public void Accept(DDay type, T1 x, T2 y)
+    {
+        _underlyingVisitor.Accept(type, x, y);
+    }
+
+    public void Accept(DHour type, T1 x, T2 y)
+    {
+        _underlyingVisitor.Accept(type, x, y);
+    }
+
+    public void Accept(DMinute type, T1 x, T2 y)
+    {
+        _underlyingVisitor.Accept(type, x, y);
+    }
+
+    public void Accept(DSecond type, T1 x, T2 y)
+    {
+        _underlyingVisitor.Accept(type, x, y);
+    }
+
+    public void Accept(DMillisecond type, T1 x, T2 y)
     {
         _underlyingVisitor.Accept(type, x, y);
     }

@@ -26,6 +26,7 @@ using Luban.Defs;
 using Luban.Types;
 using Luban.TypeVisitors;
 using Luban.Utils;
+using NLog;
 
 namespace Luban.DataLoader.Builtin.DataVisitors;
 
@@ -304,6 +305,76 @@ class SheetDataCreator : ITypeFuncVisitor<RowColumnSheet, TitleRow, DType>
         return DataUtil.CreateDateTime(d.ToString());
     }
 
+    public DType Accept(TDay type, RowColumnSheet sheet, TitleRow row)
+    {
+        var d = row.Current;
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        if (d == null)
+        {
+            d = "0";
+        }
+        return DataUtil.CreateDay(d.ToString());
+    }
+
+    public DType Accept(THour type, RowColumnSheet sheet, TitleRow row)
+    {
+        var d = row.Current;
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        if (d == null)
+        {
+            d = "0";
+        }
+        return DataUtil.CreateHour(d.ToString());
+    }
+
+    public DType Accept(TMinute type, RowColumnSheet sheet, TitleRow row)
+    {
+        var d = row.Current;
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        if (d == null)
+        {
+            d = "0";
+        }
+        return DataUtil.CreateMinute(d.ToString());
+    }
+
+    public DType Accept(TSecond type, RowColumnSheet sheet, TitleRow row)
+    {
+        var d = row.Current;
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        if (d == null)
+        {
+            d = "0";
+        }
+        return DataUtil.CreateSecond(d.ToString());
+    }
+
+    public DType Accept(TMillisecond type, RowColumnSheet sheet, TitleRow row)
+    {
+        var d = row.Current;
+        if (CheckNull(type.IsNullable, d))
+        {
+            return null;
+        }
+        if (d == null)
+        {
+            d = "0";
+        }
+        return DataUtil.CreateMillisecond(d.ToString());
+    }
+
     private bool TryGetBeanField(TitleRow row, DefField field, out TitleRow ele)
     {
         if (!string.IsNullOrEmpty(field.CurrentVariantNameWithFieldName))
@@ -326,12 +397,12 @@ class SheetDataCreator : ITypeFuncVisitor<RowColumnSheet, TitleRow, DType>
         }
         return false;
     }
+    private static NLog.Logger s_logger => NLog.LogManager.GetCurrentClassLogger();
 
     private List<DType> CreateBeanFields(DefBean bean, RowColumnSheet sheet, TitleRow row)
     {
         var list = new List<DType>();
         foreach (DefField f in bean.HierarchyFields)
-
         {
             string fname = f.Name;
             if (!TryGetBeanField(row, f, out var field))
@@ -340,7 +411,8 @@ class SheetDataCreator : ITypeFuncVisitor<RowColumnSheet, TitleRow, DType>
             }
             try
             {
-                list.Add(f.CType.Apply(this, sheet, field));
+                var v = f.CType.Apply(this, sheet, field);
+                list.Add(v);
             }
             catch (DataCreateException dce)
             {
@@ -349,6 +421,7 @@ class SheetDataCreator : ITypeFuncVisitor<RowColumnSheet, TitleRow, DType>
             }
             catch (Exception e)
             {
+                s_logger.Info("error: {} \n {}", e.Message, e.StackTrace);
                 var dce = new DataCreateException(e, $"Sheet:{sheet.SheetName} 字段:{fname} 位置:{field.Location}");
                 dce.Push(bean, f);
                 throw dce;

@@ -75,6 +75,31 @@ public abstract class ToLiteralVisitorBase : IDataFuncVisitor<string>
         return type.UnixTimeOfCurrentContext().ToString();
     }
 
+    public virtual string Accept(DDay type)
+    {
+        return type.Value.ToString();
+    }
+
+    public virtual string Accept(DHour type)
+    {
+        return type.Value.ToString();
+    }
+
+    public virtual string Accept(DMinute type)
+    {
+        return type.Value.ToString();
+    }
+
+    public virtual string Accept(DSecond type)
+    {
+        return type.Value.ToString();
+    }
+
+    public virtual string Accept(DMillisecond type)
+    {
+        return type.Value.ToString();
+    }
+
     public abstract string Accept(DBean type);
 
     public abstract string Accept(DArray type);

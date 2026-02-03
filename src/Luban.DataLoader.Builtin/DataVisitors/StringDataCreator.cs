@@ -150,6 +150,31 @@ class StringDataCreator : ITypeFuncVisitor<string, DType>
 
     public DType Accept(TDateTime type, string x)
     {
-        throw new NotSupportedException();
+        return DataUtil.CreateDateTime(x);
+    }
+
+    public DType Accept(TDay type, string x)
+    {
+        return DataUtil.CreateDay(x);
+    }
+
+    public DType Accept(THour type, string x)
+    {
+        return DataUtil.CreateHour(x);
+    }
+
+    public DType Accept(TMinute type, string x)
+    {
+        return DataUtil.CreateMinute(x);
+    }
+
+    public DType Accept(TSecond type, string x)
+    {
+        return DataUtil.CreateSecond(x);
+    }
+
+    public DType Accept(TMillisecond type, string x)
+    {
+        return DataUtil.CreateMillisecond(x);
     }
 }

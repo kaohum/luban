@@ -92,6 +92,31 @@ public abstract class DataTransfomerBase : IDataTransformer, IDataFuncVisitor2<D
         return data;
     }
 
+    DType IDataFuncVisitor2<DType>.Accept(DDay data, TType type)
+    {
+        return data;
+    }
+
+    DType IDataFuncVisitor2<DType>.Accept(DHour data, TType type)
+    {
+        return data;
+    }
+
+    DType IDataFuncVisitor2<DType>.Accept(DMinute data, TType type)
+    {
+        return data;
+    }
+
+    DType IDataFuncVisitor2<DType>.Accept(DSecond data, TType type)
+    {
+        return data;
+    }
+
+    DType IDataFuncVisitor2<DType>.Accept(DMillisecond data, TType type)
+    {
+        return data;
+    }
+
     DType IDataFuncVisitor2<DType>.Accept(DBean data, TType type)
     {
         var defFields = data.ImplType.HierarchyFields;

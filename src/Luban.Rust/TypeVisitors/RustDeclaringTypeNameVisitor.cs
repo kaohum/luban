@@ -78,6 +78,31 @@ public class RustDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
         return "u64";
     }
 
+    public string Accept(TDay type)
+    {
+        return "u64";
+    }
+
+    public string Accept(THour type)
+    {
+        return "u64";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "u64";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "u64";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "u64";
+    }
+
     public string Accept(TBean type)
     {
         return type.DefBean.IsAbstractType

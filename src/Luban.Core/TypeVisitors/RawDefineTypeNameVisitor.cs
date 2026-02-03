@@ -76,6 +76,31 @@ public class RawDefineTypeNameVisitor : ITypeFuncVisitor<string>
         return "datetime";
     }
 
+    public string Accept(TDay type)
+    {
+        return "day";
+    }
+
+    public string Accept(THour type)
+    {
+        return "hour";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "minute";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "second";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "millisecond";
+    }
+
     public string Accept(TBean type)
     {
         return type.DefBean.FullName;

@@ -78,6 +78,31 @@ public class JavaJsonUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, str
         return $"{x} = {json}.getAsLong();";
     }
 
+    public string Accept(TDay type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.getAsLong();";
+    }
+
+    public string Accept(THour type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.getAsLong();";
+    }
+
+    public string Accept(TMinute type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.getAsLong();";
+    }
+
+    public string Accept(TSecond type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.getAsLong();";
+    }
+
+    public string Accept(TMillisecond type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.getAsLong();";
+    }
+
     public string Accept(TBean type, string json, string x, int depth)
     {
         return $"{x} = {type.DefBean.FullNameWithTopModule}.deserialize({json}.getAsJsonObject());";

@@ -215,4 +215,29 @@ class YamlDataCreator : ITypeFuncVisitor<YamlNode, DefAssembly, DType>
     {
         return DataUtil.CreateDateTime(GetLowerTextValue(x));
     }
+
+    public DType Accept(TDay type, YamlNode x, DefAssembly y)
+    {
+        return DataUtil.CreateDay(GetLowerTextValue(x));
+    }
+
+    public DType Accept(THour type, YamlNode x, DefAssembly y)
+    {
+        return DataUtil.CreateHour(GetLowerTextValue(x));
+    }
+
+    public DType Accept(TMinute type, YamlNode x, DefAssembly y)
+    {
+        return DataUtil.CreateMinute(GetLowerTextValue(x));
+    }
+
+    public DType Accept(TSecond type, YamlNode x, DefAssembly y)
+    {
+        return DataUtil.CreateSecond(GetLowerTextValue(x));
+    }
+
+    public DType Accept(TMillisecond type, YamlNode x, DefAssembly y)
+    {
+        return DataUtil.CreateMillisecond(GetLowerTextValue(x));
+    }
 }

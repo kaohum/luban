@@ -77,6 +77,31 @@ public class StringDeserializeVisitor : ITypeFuncVisitor<string, string, string>
         throw new NotSupportedException();
     }
 
+    public string Accept(TDay type, string strName, string varName)
+    {
+        throw new NotSupportedException();
+    }
+
+    public string Accept(THour type, string strName, string varName)
+    {
+        throw new NotSupportedException();
+    }
+
+    public string Accept(TMinute type, string strName, string varName)
+    {
+        throw new NotSupportedException();
+    }
+
+    public string Accept(TSecond type, string strName, string varName)
+    {
+        throw new NotSupportedException();
+    }
+
+    public string Accept(TMillisecond type, string strName, string varName)
+    {
+        throw new NotSupportedException();
+    }
+
     public string Accept(TBean type, string strName, string varName)
     {
         throw new NotSupportedException();

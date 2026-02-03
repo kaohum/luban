@@ -31,6 +31,31 @@ class IsValidTableKeyTypeVisitor : AllTrueVisitor
         return false;
     }
 
+    public override bool Accept(TDay type)
+    {
+        return true;
+    }
+
+    public override bool Accept(THour type)
+    {
+        return true;
+    }
+
+    public override bool Accept(TMinute type)
+    {
+        return true;
+    }
+
+    public override bool Accept(TSecond type)
+    {
+        return true;
+    }
+
+    public override bool Accept(TMillisecond type)
+    {
+        return true;
+    }
+
     public override bool Accept(TBean type)
     {
         return false;

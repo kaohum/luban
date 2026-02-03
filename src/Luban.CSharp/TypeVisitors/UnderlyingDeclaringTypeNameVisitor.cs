@@ -102,4 +102,29 @@ public class UnderlyingDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
     {
         return "long";
     }
+
+    public virtual string Accept(TDay type)
+    {
+        return "long";
+    }
+
+    public virtual string Accept(THour type)
+    {
+        return "long";
+    }
+
+    public virtual string Accept(TMinute type)
+    {
+        return "long";
+    }
+
+    public virtual string Accept(TSecond type)
+    {
+        return "long";
+    }
+
+    public virtual string Accept(TMillisecond type)
+    {
+        return "long";
+    }
 }

@@ -76,6 +76,31 @@ public abstract class DecoratorFuncVisitor<TR> : ITypeFuncVisitor<TR>
         return DoAccept(type);
     }
 
+    public virtual TR Accept(TDay type)
+    {
+        return DoAccept(type);
+    }
+
+    public virtual TR Accept(THour type)
+    {
+        return DoAccept(type);
+    }
+
+    public virtual TR Accept(TMinute type)
+    {
+        return DoAccept(type);
+    }
+
+    public virtual TR Accept(TSecond type)
+    {
+        return DoAccept(type);
+    }
+
+    public virtual TR Accept(TMillisecond type)
+    {
+        return DoAccept(type);
+    }
+
     public virtual TR Accept(TBean type)
     {
         return DoAccept(type);
@@ -156,6 +181,31 @@ public abstract class DecoratorFuncVisitor<T1, TR> : ITypeFuncVisitor<T1, TR>
         return DoAccept(type, x);
     }
 
+    public virtual TR Accept(TDay type, T1 x)
+    {
+        return DoAccept(type, x);
+    }
+
+    public virtual TR Accept(THour type, T1 x)
+    {
+        return DoAccept(type, x);
+    }
+
+    public virtual TR Accept(TMinute type, T1 x)
+    {
+        return DoAccept(type, x);
+    }
+
+    public virtual TR Accept(TSecond type, T1 x)
+    {
+        return DoAccept(type, x);
+    }
+
+    public virtual TR Accept(TMillisecond type, T1 x)
+    {
+        return DoAccept(type, x);
+    }
+
     public virtual TR Accept(TBean type, T1 x)
     {
         return DoAccept(type, x);
@@ -232,6 +282,31 @@ public abstract class DecoratorFuncVisitor<T1, T2, TR> : ITypeFuncVisitor<T1, T2
     }
 
     public virtual TR Accept(TDateTime type, T1 x, T2 y)
+    {
+        return DoAccept(type, x, y);
+    }
+
+    public virtual TR Accept(TDay type, T1 x, T2 y)
+    {
+        return DoAccept(type, x, y);
+    }
+
+    public virtual TR Accept(THour type, T1 x, T2 y)
+    {
+        return DoAccept(type, x, y);
+    }
+
+    public virtual TR Accept(TMinute type, T1 x, T2 y)
+    {
+        return DoAccept(type, x, y);
+    }
+
+    public virtual TR Accept(TSecond type, T1 x, T2 y)
+    {
+        return DoAccept(type, x, y);
+    }
+
+    public virtual TR Accept(TMillisecond type, T1 x, T2 y)
     {
         return DoAccept(type, x, y);
     }
@@ -317,6 +392,31 @@ public abstract class DecoratorFuncVisitor<T1, T2, T3, TR> : ITypeFuncVisitor<T1
         return DoAccept(type, x, y, z);
     }
 
+    public virtual TR Accept(TDay type, T1 x, T2 y, T3 z)
+    {
+        return DoAccept(type, x, y, z);
+    }
+
+    public virtual TR Accept(THour type, T1 x, T2 y, T3 z)
+    {
+        return DoAccept(type, x, y, z);
+    }
+
+    public virtual TR Accept(TMinute type, T1 x, T2 y, T3 z)
+    {
+        return DoAccept(type, x, y, z);
+    }
+
+    public virtual TR Accept(TSecond type, T1 x, T2 y, T3 z)
+    {
+        return DoAccept(type, x, y, z);
+    }
+
+    public virtual TR Accept(TMillisecond type, T1 x, T2 y, T3 z)
+    {
+        return DoAccept(type, x, y, z);
+    }
+
     public virtual TR Accept(TBean type, T1 x, T2 y, T3 z)
     {
         return DoAccept(type, x, y, z);
@@ -395,6 +495,31 @@ public abstract class DecoratorFuncVisitor<T1, T2, T3, T4, TR> : ITypeFuncVisito
     }
 
     public virtual TR Accept(TDateTime type, T1 a, T2 b, T3 c, T4 d)
+    {
+        return DoAccept(type, a, b, c, d);
+    }
+
+    public virtual TR Accept(TDay type, T1 a, T2 b, T3 c, T4 d)
+    {
+        return DoAccept(type, a, b, c, d);
+    }
+
+    public virtual TR Accept(THour type, T1 a, T2 b, T3 c, T4 d)
+    {
+        return DoAccept(type, a, b, c, d);
+    }
+
+    public virtual TR Accept(TMinute type, T1 a, T2 b, T3 c, T4 d)
+    {
+        return DoAccept(type, a, b, c, d);
+    }
+
+    public virtual TR Accept(TSecond type, T1 a, T2 b, T3 c, T4 d)
+    {
+        return DoAccept(type, a, b, c, d);
+    }
+
+    public virtual TR Accept(TMillisecond type, T1 a, T2 b, T3 c, T4 d)
     {
         return DoAccept(type, a, b, c, d);
     }

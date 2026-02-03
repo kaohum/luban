@@ -82,6 +82,31 @@ public class JsonDataVisitor : IDataActionVisitor<Utf8JsonWriter>
         x.WriteNumberValue(type.UnixTimeOfCurrentContext());
     }
 
+    public virtual void Accept(DDay type, Utf8JsonWriter x)
+    {
+        x.WriteNumberValue(type.Value);
+    }
+
+    public virtual void Accept(DHour type, Utf8JsonWriter x)
+    {
+        x.WriteNumberValue(type.Value);
+    }
+
+    public virtual void Accept(DMinute type, Utf8JsonWriter x)
+    {
+        x.WriteNumberValue(type.Value);
+    }
+
+    public virtual void Accept(DSecond type, Utf8JsonWriter x)
+    {
+        x.WriteNumberValue(type.Value);
+    }
+
+    public virtual void Accept(DMillisecond type, Utf8JsonWriter x)
+    {
+        x.WriteNumberValue(type.Value);
+    }
+
     public virtual void Accept(DBean type, Utf8JsonWriter x)
     {
         x.WriteStartObject();

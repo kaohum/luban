@@ -200,4 +200,29 @@ class XmlDataCreator : ITypeFuncVisitor<XElement, DefAssembly, DType>
     {
         return DataUtil.CreateDateTime(x.Value);
     }
+
+    public DType Accept(TDay type, XElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateDay(x.Value);
+    }
+
+    public DType Accept(THour type, XElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateHour(x.Value);
+    }
+
+    public DType Accept(TMinute type, XElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateMinute(x.Value);
+    }
+
+    public DType Accept(TSecond type, XElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateSecond(x.Value);
+    }
+
+    public DType Accept(TMillisecond type, XElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateMillisecond(x.Value);
+    }
 }

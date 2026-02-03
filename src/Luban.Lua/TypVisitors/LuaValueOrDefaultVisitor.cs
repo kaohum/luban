@@ -101,4 +101,29 @@ public class LuaValueOrDefaultVisitor : ITypeFuncVisitor<string, string>
     {
         return $"{x} or 0";
     }
+
+    public string Accept(TDay type, string x)
+    {
+        return $"{x} or 0";
+    }
+
+    public string Accept(THour type, string x)
+    {
+        return $"{x} or 0";
+    }
+
+    public string Accept(TMinute type, string x)
+    {
+        return $"{x} or 0";
+    }
+
+    public string Accept(TSecond type, string x)
+    {
+        return $"{x} or 0";
+    }
+
+    public string Accept(TMillisecond type, string x)
+    {
+        return $"{x} or 0";
+    }
 }

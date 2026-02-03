@@ -79,6 +79,31 @@ public class DeclaringTypeNameVisitor : ITypeFuncVisitor<string>
         return "int";
     }
 
+    public string Accept(TDay type)
+    {
+        return "int";
+    }
+
+    public string Accept(THour type)
+    {
+        return "int";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "int";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "int";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "int";
+    }
+
     public string Accept(TBean type)
     {
         return GdscriptCommonTemplateExtension.FullName(type.DefBean);

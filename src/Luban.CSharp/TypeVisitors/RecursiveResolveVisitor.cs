@@ -77,6 +77,31 @@ public class RecursiveResolveVisitor : ITypeFuncVisitor<string, string, string>
         throw new NotImplementedException();
     }
 
+    public string Accept(TDay type, string fieldName, string tablesName)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(THour type, string fieldName, string tablesName)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TMinute type, string fieldName, string tablesName)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TSecond type, string fieldName, string tablesName)
+    {
+        throw new NotImplementedException();
+    }
+
+    public string Accept(TMillisecond type, string fieldName, string tablesName)
+    {
+        throw new NotImplementedException();
+    }
+
     public string Accept(TBean type, string fieldName, string tablesName)
     {
         return $"{fieldName}?.Resolve({tablesName});";

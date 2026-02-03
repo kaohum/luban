@@ -77,6 +77,31 @@ public class ProtobufBinDataVisitor : IDataActionVisitor<CodedOutputStream>
         x.WriteInt64(type.UnixTimeOfCurrentContext());
     }
 
+    public void Accept(DDay type, CodedOutputStream x)
+    {
+        x.WriteInt64(type.Value);
+    }
+
+    public void Accept(DHour type, CodedOutputStream x)
+    {
+        x.WriteInt64(type.Value);
+    }
+
+    public void Accept(DMinute type, CodedOutputStream x)
+    {
+        x.WriteInt64(type.Value);
+    }
+
+    public void Accept(DSecond type, CodedOutputStream x)
+    {
+        x.WriteInt64(type.Value);
+    }
+
+    public void Accept(DMillisecond type, CodedOutputStream x)
+    {
+        x.WriteInt64(type.Value);
+    }
+
     public void Accept(DString type, CodedOutputStream x)
     {
         x.WriteString(type.Value);

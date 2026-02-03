@@ -76,6 +76,31 @@ public class IsSimpleLiteralDataVisitor : IDataFuncVisitor<bool>
         return true;
     }
 
+    public bool Accept(DDay type)
+    {
+        return true;
+    }
+
+    public bool Accept(DHour type)
+    {
+        return true;
+    }
+
+    public bool Accept(DMinute type)
+    {
+        return true;
+    }
+
+    public bool Accept(DSecond type)
+    {
+        return true;
+    }
+
+    public bool Accept(DMillisecond type)
+    {
+        return true;
+    }
+
     public bool Accept(DBean type)
     {
         return false;

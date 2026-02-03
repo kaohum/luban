@@ -77,6 +77,31 @@ public class DotNetJsonDeserializeVisitor : ITypeFuncVisitor<string, string, int
         return $"{x} = {json}.GetInt64();";
     }
 
+    public string Accept(TDay type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.GetInt64();";
+    }
+
+    public string Accept(THour type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.GetInt64();";
+    }
+
+    public string Accept(TMinute type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.GetInt64();";
+    }
+
+    public string Accept(TSecond type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.GetInt64();";
+    }
+
+    public string Accept(TMillisecond type, string json, string x, int depth)
+    {
+        return $"{x} = {json}.GetInt64();";
+    }
+
     public string Accept(TBean type, string json, string x, int depth)
     {
         string src = $"{CSharpUtil.GetFullNameWithGlobalQualifier(type.DefBean)}.Deserialize{type.DefBean.Name}({json})";

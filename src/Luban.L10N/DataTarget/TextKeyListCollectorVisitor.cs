@@ -88,6 +88,31 @@ public class TextKeyListCollectorVisitor : IDataActionVisitor2<TextKeyCollection
 
     }
 
+    public void Accept(DDay data, TType type, TextKeyCollection x)
+    {
+
+    }
+
+    public void Accept(DHour data, TType type, TextKeyCollection x)
+    {
+
+    }
+
+    public void Accept(DMinute data, TType type, TextKeyCollection x)
+    {
+
+    }
+
+    public void Accept(DSecond data, TType type, TextKeyCollection x)
+    {
+
+    }
+
+    public void Accept(DMillisecond data, TType type, TextKeyCollection x)
+    {
+
+    }
+
     public void Accept(DBean data, TType type, TextKeyCollection x)
     {
 

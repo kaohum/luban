@@ -76,6 +76,31 @@ public abstract class DecoratorActionVisitor<T> : ITypeActionVisitor<T>
         DoAccept(type, x);
     }
 
+    public virtual void Accept(TDay type, T x)
+    {
+        DoAccept(type, x);
+    }
+
+    public virtual void Accept(THour type, T x)
+    {
+        DoAccept(type, x);
+    }
+
+    public virtual void Accept(TMinute type, T x)
+    {
+        DoAccept(type, x);
+    }
+
+    public virtual void Accept(TSecond type, T x)
+    {
+        DoAccept(type, x);
+    }
+
+    public virtual void Accept(TMillisecond type, T x)
+    {
+        DoAccept(type, x);
+    }
+
     public virtual void Accept(TBean type, T x)
     {
         DoAccept(type, x);
@@ -154,6 +179,31 @@ public abstract class DecoratorActionVisitor<T1, T2> : ITypeActionVisitor<T1, T2
     }
 
     public virtual void Accept(TDateTime type, T1 x, T2 y)
+    {
+        DoAccept(type, x, y);
+    }
+
+    public virtual void Accept(TDay type, T1 x, T2 y)
+    {
+        DoAccept(type, x, y);
+    }
+
+    public virtual void Accept(THour type, T1 x, T2 y)
+    {
+        DoAccept(type, x, y);
+    }
+
+    public virtual void Accept(TMinute type, T1 x, T2 y)
+    {
+        DoAccept(type, x, y);
+    }
+
+    public virtual void Accept(TSecond type, T1 x, T2 y)
+    {
+        DoAccept(type, x, y);
+    }
+
+    public virtual void Accept(TMillisecond type, T1 x, T2 y)
     {
         DoAccept(type, x, y);
     }

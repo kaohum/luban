@@ -210,4 +210,29 @@ public class JsonDataCreator : ITypeFuncVisitor<JsonElement, DefAssembly, DType>
     {
         return DataUtil.CreateDateTime(x.GetString());
     }
+
+    public DType Accept(TDay type, JsonElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateDay(x.GetString());
+    }
+
+    public DType Accept(THour type, JsonElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateHour(x.GetString());
+    }
+
+    public DType Accept(TMinute type, JsonElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateMinute(x.GetString());
+    }
+
+    public DType Accept(TSecond type, JsonElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateSecond(x.GetString());
+    }
+
+    public DType Accept(TMillisecond type, JsonElement x, DefAssembly ass)
+    {
+        return DataUtil.CreateMillisecond(x.GetString());
+    }
 }

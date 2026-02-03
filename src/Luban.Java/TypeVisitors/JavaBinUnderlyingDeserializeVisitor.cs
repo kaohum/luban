@@ -135,4 +135,29 @@ class JavaBinUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string, int
     {
         return $"{fieldName} = {bufName}.readLong();";
     }
+
+    public string Accept(TDay type, string bufName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufName}.readLong();";
+    }
+
+    public string Accept(THour type, string bufName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufName}.readLong();";
+    }
+
+    public string Accept(TMinute type, string bufName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufName}.readLong();";
+    }
+
+    public string Accept(TSecond type, string bufName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufName}.readLong();";
+    }
+
+    public string Accept(TMillisecond type, string bufName, string fieldName, int depth)
+    {
+        return $"{fieldName} = {bufName}.readLong();";
+    }
 }

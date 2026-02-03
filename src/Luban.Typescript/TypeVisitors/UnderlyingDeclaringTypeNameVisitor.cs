@@ -101,4 +101,29 @@ public class UnderlyingDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
     {
         return "number";
     }
+
+    public string Accept(TDay type)
+    {
+        return "number";
+    }
+
+    public string Accept(THour type)
+    {
+        return "number";
+    }
+
+    public string Accept(TMinute type)
+    {
+        return "number";
+    }
+
+    public string Accept(TSecond type)
+    {
+        return "number";
+    }
+
+    public string Accept(TMillisecond type)
+    {
+        return "number";
+    }
 }

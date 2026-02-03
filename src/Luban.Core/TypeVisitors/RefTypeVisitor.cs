@@ -77,6 +77,31 @@ class RefTypeVisitor : ITypeActionVisitor<Dictionary<string, DefTypeBase>>
 
     }
 
+    public void Accept(TDay type, Dictionary<string, DefTypeBase> x)
+    {
+
+    }
+
+    public void Accept(THour type, Dictionary<string, DefTypeBase> x)
+    {
+
+    }
+
+    public void Accept(TMinute type, Dictionary<string, DefTypeBase> x)
+    {
+
+    }
+
+    public void Accept(TSecond type, Dictionary<string, DefTypeBase> x)
+    {
+
+    }
+
+    public void Accept(TMillisecond type, Dictionary<string, DefTypeBase> x)
+    {
+
+    }
+
     void Walk(DefBean type, Dictionary<string, DefTypeBase> types)
     {
         if (types.TryAdd(type.FullName, type))
