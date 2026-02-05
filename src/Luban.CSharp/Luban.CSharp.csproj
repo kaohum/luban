@@ -101,6 +101,9 @@
     <None Update="Templates\cs-l10n-language\language.sbn">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Templates\cs-field-value-reference\field-value-reference.sbn">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">

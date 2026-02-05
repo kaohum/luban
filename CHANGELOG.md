@@ -1,5 +1,38 @@
 ## 变更日志
 
+### 2026-02-03
+
+- **扩展基础类型，支持时间相关类型**
+  - 新增 5 种时间相关的基础类型：`day`、`hour`、`minute`、`second`、`millisecond`。
+  - 新增对应的数据类型类：
+    - `TDay` / `DDay`：表示天数，底层为 int 类型。
+    - `THour` / `DHour`：表示小时数，底层为 int 类型。
+    - `TMinute` / `DMinute`：表示分钟数，底层为 int 类型。
+    - `TSecond` / `DSecond`：表示秒数，底层为 int 类型。
+    - `TMillisecond` / `DMillisecond`：表示毫秒数，底层为 long 类型。
+  - 在 `DefAssembly` 中注册新的时间类型，支持在配置表中直接使用。
+  - 在 `DataUtil` 中新增时间类型的解析逻辑，支持多种时间格式输入：
+    - 纯数字格式：直接表示对应单位的数值（如 `100` 表示 100 天/小时/分钟/秒/毫秒）。
+    - 带单位格式：支持 `d`（天）、`h`（小时）、`m`（分钟）、`s`（秒）、`ms`（毫秒）等单位后缀。
+    - 复合格式：支持多个单位组合，如 `1d2h30m`（1天2小时30分钟）。
+    - 自动单位转换：输入会自动转换为目标类型的基础单位。
+  - 更新所有语言代码生成器，支持新时间类型的序列化和反序列化：
+    - C#：支持 Binary、JSON（DotNet/NewtonSoft/Simple）、String 等多种序列化方式。
+    - C++：支持底层类型声明和反序列化。
+    - Java：支持 Binary 和 JSON 反序列化。
+    - Go：支持 Binary 和 JSON 反序列化。
+    - Lua：支持类型注释和反序列化方法。
+    - TypeScript/JavaScript：支持 Binary 和 JSON 反序列化。
+    - Python：支持 JSON 反序列化。
+    - Rust：支持 Binary 和 JSON 反序列化。
+    - Dart：支持 JSON 反序列化。
+    - PHP：支持 JSON 反序列化。
+    - GDScript：支持类型声明和反序列化。
+  - 更新所有数据加载器，支持从各种数据源（Excel、JSON、XML、YAML、Lua 等）加载时间类型数据。
+  - 更新所有数据导出器，支持将时间类型导出为 Binary、JSON、XML、YAML、Protobuf 等格式。
+  - 时间类型可用作表的主键和索引字段。
+  - 详细使用说明参见 `docs/时间类型使用文档.md` 文档。
+
 ### 2026-02-02
 
 - **支持 CSV 中间格式的导出**

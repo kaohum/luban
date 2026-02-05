@@ -1,0 +1,315 @@
+{{~
+# 字段值引用查询代码生成模板
+# 用于生成查询指定字段值引用来源的代码
+
+# 定义分组类型（可以根据需要添加更多）
+group_types = ["BuildingType", "WorkerType", "HeroType", "ItemType"]
+
+# 为每个目标值收集分组信息
+# 使用独立的数据结构存储分组信息
+target_groups = []
+
+for target in __target_values
+    # 为当前目标值创建分组信息
+    current_groups = {}
+    
+    # 遍历每个分组类型
+    for group_type in group_types
+        current_groups[group_type] = []
+        
+        # 遍历该目标值的所有引用
+        for ref in target.references
+            # 检查引用记录字段是否存在
+            if ref.record_fields
+                # 检查是否有该分组字段
+                group_value = ref.record_fields[group_type]
+                if group_value
+                    # 去重添加
+                    if !array.contains current_groups[group_type] group_value
+                        array.add current_groups[group_type] group_value
+                    end
+                end
+            end
+        end
+    end
+    
+    # 保存当前目标值的分组信息
+    array.add target_groups current_groups
+end
+~}}
+{{__ctx.file_header}}
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+{{~if __namespace~}}
+namespace {{__namespace}}
+{
+{{~end~}}
+
+/// <summary>
+/// 字段值引用查询类
+/// 目标表: {{__target_table}}
+/// 目标字段: {{__target_field}}
+/// 生成时间: {{date.now}}
+/// </summary>
+public static class FieldValueReference_{{__target_table}}_{{__target_field}}
+{
+    /// <summary>
+    /// 引用信息
+    /// </summary>
+    public class ReferenceInfo
+    {
+        /// <summary>
+        /// 引用该值的表名
+        /// </summary>
+        public string TableName { get; set; }
+        
+        /// <summary>
+        /// 引用该值的记录ID
+        /// </summary>
+        public string RecordId { get; set; }
+        
+        /// <summary>
+        /// 引用该值的字段名
+        /// </summary>
+        public string FieldName { get; set; }
+        
+        /// <summary>
+        /// 字段路径
+        /// </summary>
+        public string FieldPath { get; set; }
+        
+        /// <summary>
+        /// 字段值
+        /// </summary>
+        public string FieldValue { get; set; }
+        
+        /// <summary>
+        /// 记录的所有字段（用于分组查询）
+        /// </summary>
+        public Dictionary<string, string> RecordFields { get; set; }
+    }
+    
+    /// <summary>
+    /// 目标值信息
+    /// </summary>
+    public class TargetValueInfo
+    {
+        /// <summary>
+        /// 目标记录ID
+        /// </summary>
+        public string RecordId { get; set; }
+        
+        /// <summary>
+        /// 目标值
+        /// </summary>
+        public string Value { get; set; }
+        
+        /// <summary>
+        /// 引用该值的所有位置
+        /// </summary>
+        public List<ReferenceInfo> References { get; set; }
+    }
+    
+    /// <summary>
+    /// 统计信息
+    /// </summary>
+    public static class Statistics
+    {
+        /// <summary>
+        /// 目标值数量
+        /// </summary>
+        public const int TargetValueCount = {{__target_values.size}};
+        
+        /// <summary>
+        /// 总引用数量
+        /// </summary>
+        public static readonly int TotalReferenceCount = {{~
+            total = 0
+            for target in __target_values
+                total = total + target.references.size
+            end
+            total
+        ~}};
+    }
+    
+    /// <summary>
+    /// 所有目标值及其引用信息
+    /// </summary>
+    private static readonly List<TargetValueInfo> _targetValues = new List<TargetValueInfo>
+    {
+{{~if __target_values.size > 0~}}
+{{~for target in __target_values~}}
+        new TargetValueInfo
+        {
+            RecordId = "{{target.record_id}}",
+            Value = "{{target.field_value_string}}",
+            References = new List<ReferenceInfo>
+            {
+{{~if target.references.size > 0~}}
+{{~for ref in target.references~}}
+                new ReferenceInfo
+                {
+                    TableName = "{{ref.table_name}}",
+                    RecordId = "{{ref.record_id}}",
+                    FieldName = "{{ref.field_name}}",
+                    FieldPath = "{{ref.field_path}}",
+                    FieldValue = "{{ref.field_value}}",
+                    RecordFields = new Dictionary<string, string>
+                    {
+{{~for field in ref.record_fields~}}
+                        { "{{field.key}}", "{{field.value}}" },
+{{~end~}}
+                    }
+                },
+{{~end~}}
+{{~end~}}
+            }
+        },
+{{~end~}}
+{{~else~}}
+        // 未找到任何目标值
+{{~end~}}
+    };
+    
+    /// <summary>
+    /// 获取所有目标值信息
+    /// </summary>
+    public static IReadOnlyList<TargetValueInfo> GetAllTargetValues()
+    {
+        return _targetValues.AsReadOnly();
+    }
+    
+    /// <summary>
+    /// 根据目标值获取引用信息
+    /// </summary>
+    public static TargetValueInfo GetReferencesByValue(string value)
+    {
+        return _targetValues.FirstOrDefault(t => t.Value == value);
+    }
+    
+    /// <summary>
+    /// 根据记录ID获取引用信息
+    /// </summary>
+    public static TargetValueInfo GetReferencesByRecordId(string recordId)
+    {
+        return _targetValues.FirstOrDefault(t => t.RecordId == recordId);
+    }
+    
+    /// <summary>
+    /// 获取指定表的所有引用
+    /// </summary>
+    public static IEnumerable<ReferenceInfo> GetReferencesByTable(string tableName)
+    {
+        return _targetValues
+            .SelectMany(t => t.References)
+            .Where(r => r.TableName == tableName);
+    }
+    
+    /// <summary>
+    /// 检查指定值是否被引用
+    /// </summary>
+    public static bool HasReferences(string value)
+    {
+        var target = GetReferencesByValue(value);
+        return target != null && target.References.Count > 0;
+    }
+    
+    /// <summary>
+    /// 获取所有被引用的值
+    /// </summary>
+    public static IEnumerable<string> GetReferencedValues()
+    {
+        return _targetValues
+            .Where(t => t.References.Count > 0)
+            .Select(t => t.Value);
+    }
+    
+    /// <summary>
+    /// 获取所有未被引用的值
+    /// </summary>
+    public static IEnumerable<string> GetUnreferencedValues()
+    {
+        return _targetValues
+            .Where(t => t.References.Count == 0)
+            .Select(t => t.Value);
+    }
+    
+{{~# 生成分组相关代码~}}
+{{~for group_type in group_types~}}
+{{~# 检查是否有任何目标值使用了这个分组类型~}}
+{{~has_group = false~}}
+{{~target_index = 0~}}
+{{~for target in __target_values~}}
+{{~if target_index < target_groups.size~}}
+{{~current_group = target_groups[target_index]~}}
+{{~if current_group && current_group[group_type] && current_group[group_type].size > 0~}}
+{{~has_group = true~}}
+{{~break~}}
+{{~end~}}
+{{~end~}}
+{{~target_index = target_index + 1~}}
+{{~end~}}
+{{~if has_group~}}
+    
+    /// <summary>
+    /// 按 {{group_type}} 分组的引用字段
+    /// 索引对应 _targetValues 的索引
+    /// </summary>
+    private static readonly string[][] _referenceFieldsBy{{group_type}} =
+    {
+{{~target_index = 0~}}
+{{~for target in __target_values~}}
+        new string[] 
+        {
+{{~if target_index < target_groups.size~}}
+{{~current_group = target_groups[target_index]~}}
+{{~if current_group && current_group[group_type] && current_group[group_type].size > 0~}}
+{{~for group_value in current_group[group_type]~}}
+            "{{group_value}}",
+{{~end~}}
+{{~else~}}
+            // 该目标值没有 {{group_type}} 类型的引用
+{{~end~}}
+{{~else~}}
+            // 索引越界
+{{~end~}}
+        },
+{{~target_index = target_index + 1~}}
+{{~end~}}
+    };
+    
+    /// <summary>
+    /// 根据目标值获取引用的 {{group_type}} 列表
+    /// </summary>
+    /// <param name="value">目标字段的值</param>
+    /// <returns>引用该值的所有 {{group_type}}</returns>
+    public static string[] GetReferenceBy{{group_type}}(string value)
+    {
+        var targetIndex = -1;
+        for (int i = 0; i < _targetValues.Count; i++)
+        {
+            if (_targetValues[i].Value == value)
+            {
+                targetIndex = i;
+                break;
+            }
+        }
+        
+        if (targetIndex >= 0 && targetIndex < _referenceFieldsBy{{group_type}}.Length)
+        {
+            return _referenceFieldsBy{{group_type}}[targetIndex];
+        }
+        
+        return Array.Empty<string>();
+    }
+{{~end~}}
+{{~end~}}
+}
+
+{{~if __namespace~}}
+}
+{{~end~}}
+
