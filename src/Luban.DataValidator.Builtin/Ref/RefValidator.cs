@@ -85,16 +85,17 @@ public class RefValidator : DataValidatorBase
 
     public override void Validate(DataValidatorContext ctx, TType type, DType key)
     {
+        if (key.Apply(IsDefaultValueVisitor.Ins))
+        {
+            return;
+        }
+
         var genCtx = GenerationContext.Current;
         var excludeTags = genCtx.ExcludeTags;
 
         foreach (var tableInfo in _compiledTables)
         {
-            var (defTable, field, zeroAble) = tableInfo;
-            if (zeroAble && key.Apply(IsDefaultValueVisitor.Ins))
-            {
-                return;
-            }
+            var (defTable, field, _) = tableInfo;
 
             switch (defTable.Mode)
             {
