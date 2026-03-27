@@ -9,12 +9,13 @@
   - 支持所有导出格式（bin、json、xml、yaml、csv），自动生成对应的checksum文件。
   - 自动集成到标准导出流程，无需额外配置。
   - 生成的代码文件：`ChecksumInfo.cs`、`TbChecksum.cs`（或其他语言的对应文件）。
-  - 生成的数据文件：`checksum.bytes`（或json等，取决于导出格式）。
+  - 生成的数据文件：`tbchecksum.bytes`（或json等，取决于导出格式），与表名命名一致。
   - 使用示例：
     ```csharp
-    var bytes = File.ReadAllBytes("checksum.bytes");
+    var bytes = File.ReadAllBytes("tbchecksum.bytes");
     var buf = new ByteBuf(bytes);
-    var tbChecksum = new TbChecksum(buf);
+    var tbChecksum = new TbChecksum();
+    tbChecksum.Create(buf);
     var md5 = tbChecksum.GetByTableName("BuildBaseConfig")?.Checksum;
     ```
   - 验证结果：客户端与服务器导出的checksum文件MD5完全一致。

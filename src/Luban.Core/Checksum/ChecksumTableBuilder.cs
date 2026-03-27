@@ -94,8 +94,8 @@ public static class ChecksumTableBuilder
             Mode = TableMode.LIST,
             Comment = "配置表校验和汇总表",
             InputFiles = new List<string> { "__checksum__" },
-            Groups = new List<string>(),  // 空 Groups 表示对所有目标都导出
-            OutputFile = "checksum"  // 输出文件名为 checksum
+            Groups = new List<string>()  // 空 Groups 表示对所有目标都导出
+            // 不设置 OutputFile，使用默认命名规则：TbChecksum -> tbchecksum.bytes
         };
 
         var defTable = new DefTable(rawTable);
