@@ -106,6 +106,12 @@ public class DefTable : DefTypeBase
 
     public List<ITableValidator> Validators { get; } = new();
 
+    /// <summary>
+    /// 表数据的校验和（MD5）
+    /// 基于全量数据计算，确保前后端使用相同源数据时获得相同的校验和
+    /// </summary>
+    public string Checksum { get; set; }
+
     public string OutputDataFile => string.IsNullOrWhiteSpace(_outputFile) ? FullName.Replace('.', '_').ToLower() : _outputFile;
 
     public override void Compile()

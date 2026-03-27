@@ -152,8 +152,130 @@ public class GenerationContext
             _l10nKeyInfos = null;
             TextProvider?.Load();
             DataLoaderManager.Ins.LoadDatas(this);
+
+            // 为所有表计算校验和
+            CalculateTableChecksums();
+
             _datasLoaded = true;
             s_logger.Info("load datas end");
+        }
+    }
+
+    /// <summary>
+    /// 为所有表计算校验和（MD5）
+    /// 基于全量数据计算，确保前后端使用相同源数据时获得相同的校验和
+    /// </summary>
+    private void CalculateTableChecksums()
+    {
+        s_logger.Info("calculate table checksums begin");
+
+        foreach (var table in Tables)
+        {
+            if (!_recordsByTables.TryGetValue(table.FullName, out var tableDataInfo) ||
+                tableDataInfo.FinalRecords == null ||
+                tableDataInfo.FinalRecords.Count == 0)
+            {
+                s_logger.Debug("table {TableName} has no records, checksum is empty", table.Name);
+                table.Checksum = "";
+                continue;
+            }
+
+            try
+            {
+                // 使用二进制序列化计算 MD5
+                var bytes = new Serialization.ByteBuf();
+                var records = tableDataInfo.FinalRecords;
+
+                bytes.WriteSize(records.Count);
+                foreach (var record in records)
+                {
+                    record.Data.Apply(new DataVisitors.BinaryChecksumVisitor(), bytes);
+                }
+
+                byte[] data = bytes.CopyData();
+                string checksum = Utils.FileUtil.CalcMD5(data);
+                table.Checksum = checksum;
+
+                s_logger.Debug("table {TableName} checksum: {Checksum} (records: {Count}, bytes: {Size})",
+                    table.Name, checksum, records.Count, data.Length);
+            }
+            catch (Exception ex)
+            {
+                s_logger.Error(ex, "failed to calculate checksum for table {TableName}", table.Name);
+                table.Checksum = "";
+            }
+        }
+
+        // 创建 Checksum 表的数据记录并添加到导出流程
+        CreateChecksumData();
+
+        s_logger.Info("calculate table checksums end");
+    }
+
+    /// <summary>
+    /// 创建虚拟的 Checksum 表定义（用于代码生成）
+    /// </summary>
+    private void CreateChecksumTableDef()
+    {
+        try
+        {
+            // 创建 Checksum 表定义
+            var checksumTable = Checksum.ChecksumTableBuilder.CreateChecksumTableDef(Assembly);
+
+            if (checksumTable == null)
+            {
+                s_logger.Error("Failed to create checksum table definition");
+                return;
+            }
+
+            // 将 Checksum 表添加到导出表列表，确保它会被生成代码
+            if (ExportTables == null)
+            {
+                ExportTables = new List<DefTable>();
+            }
+
+            ExportTables.Add(checksumTable);
+
+            s_logger.Info("created checksum table definition");
+        }
+        catch (Exception ex)
+        {
+            s_logger.Error(ex, "failed to create checksum table definition");
+        }
+    }
+
+    /// <summary>
+    /// 创建 Checksum 表的数据记录
+    /// </summary>
+    private void CreateChecksumData()
+    {
+        try
+        {
+            // 获取已创建的 Checksum 表
+            var checksumTable = ExportTables.FirstOrDefault(t => t.Name == "TbChecksum");
+            if (checksumTable == null)
+            {
+                s_logger.Error("TbChecksum table not found in ExportTables");
+                return;
+            }
+
+            // 创建 Checksum 数据记录
+            var checksumRecords = Checksum.ChecksumTableBuilder.CreateChecksumRecords(checksumTable, Tables);
+
+            if (checksumRecords.Count == 0)
+            {
+                s_logger.Warn("no checksum records to export");
+                return;
+            }
+
+            // 将 Checksum 表添加到数据导出流程
+            AddDataTable(checksumTable, checksumRecords, null);
+
+            s_logger.Info("created checksum table data with {Count} records", checksumRecords.Count);
+        }
+        catch (Exception ex)
+        {
+            s_logger.Error(ex, "failed to create checksum table data");
         }
     }
 
@@ -200,9 +322,20 @@ public class GenerationContext
         IsL10NBinarySplitDataExporter = string.Equals(DataExporterName, "l10n-bin-split", StringComparison.OrdinalIgnoreCase);
 
         // 确保导出用的表在全局范围内按表名稳定排序，便于模板等场景使用（例如 __tables）
-        ExportTables = Assembly.ExportTables
-            .OrderBy(t => t.Name)
-            .ToList();
+        if (Assembly.ExportTables == null)
+        {
+            ExportTables = new List<DefTable>();
+        }
+        else
+        {
+            ExportTables = Assembly.ExportTables
+                .OrderBy(t => t.Name)
+                .ToList();
+        }
+
+        // 创建虚拟的 Checksum 表定义（必须在 CalculateExportTypes 之前）
+        CreateChecksumTableDef();
+
         ExportTypes = CalculateExportTypes();
         ExportBeans = SortBeanTypes(ExportTypes.OfType<DefBean>().ToList());
         ExportEnums = ExportTypes.OfType<DefEnum>().ToList();
@@ -404,8 +537,17 @@ public class GenerationContext
 
         foreach (var table in ExportTables)
         {
+            if (table == null)
+            {
+                continue;
+            }
+
             refTypes[table.FullName] = table;
-            table.ValueTType.Apply(RefTypeVisitor.Ins, refTypes);
+
+            if (table.ValueTType != null)
+            {
+                table.ValueTType.Apply(RefTypeVisitor.Ins, refTypes);
+            }
         }
 
         return refTypes.OrderBy(p => p.Key).Select(p => p.Value).ToList();

@@ -1,5 +1,24 @@
 ## 变更日志
 
+### 2026-03-27
+
+- **配置表MD5校验和功能**
+  - 新增MD5校验和功能，用于前后端配置版本一致性验证。
+  - 创建虚拟表 `TbChecksum`，结构为 `ChecksumInfo { TableName, Checksum }`。
+  - MD5基于**全量数据**计算（所有列、所有记录），在字段过滤之前计算，确保前后端一致性。
+  - 支持所有导出格式（bin、json、xml、yaml、csv），自动生成对应的checksum文件。
+  - 自动集成到标准导出流程，无需额外配置。
+  - 生成的代码文件：`ChecksumInfo.cs`、`TbChecksum.cs`（或其他语言的对应文件）。
+  - 生成的数据文件：`checksum.bytes`（或json等，取决于导出格式）。
+  - 使用示例：
+    ```csharp
+    var bytes = File.ReadAllBytes("checksum.bytes");
+    var buf = new ByteBuf(bytes);
+    var tbChecksum = new TbChecksum(buf);
+    var md5 = tbChecksum.GetByTableName("BuildBaseConfig")?.Checksum;
+    ```
+  - 验证结果：客户端与服务器导出的checksum文件MD5完全一致。
+
 ### 2026-03-18
 
 - **ref 校验：默认值跳过关联检查**
