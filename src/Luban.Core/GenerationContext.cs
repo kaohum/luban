@@ -219,8 +219,12 @@ public class GenerationContext
     {
         try
         {
+            // 从 xargs 读取 checksum 输出文件名配置
+            // 用法: -x checksumOutputFile=checksum  或在 conf 的 xargs 中配置
+            string checksumOutputFile = EnvManager.Current.GetOptionOrDefault("", "checksumOutputFile", true, null);
+
             // 创建 Checksum 表定义
-            var checksumTable = Checksum.ChecksumTableBuilder.CreateChecksumTableDef(Assembly);
+            var checksumTable = Checksum.ChecksumTableBuilder.CreateChecksumTableDef(Assembly, checksumOutputFile);
 
             if (checksumTable == null)
             {
@@ -252,10 +256,10 @@ public class GenerationContext
         try
         {
             // 获取已创建的 Checksum 表
-            var checksumTable = ExportTables.FirstOrDefault(t => t.Name == "TbChecksum");
+            var checksumTable = ExportTables.FirstOrDefault(t => t.Name == Checksum.ChecksumTableBuilder.ChecksumTableName);
             if (checksumTable == null)
             {
-                s_logger.Error("TbChecksum table not found in ExportTables");
+                s_logger.Error("{TableName} table not found in ExportTables", Checksum.ChecksumTableBuilder.ChecksumTableName);
                 return;
             }
 

@@ -31,16 +31,18 @@ namespace Luban.Checksum;
 /// </summary>
 public static class ChecksumTableBuilder
 {
-    private const string ChecksumTableName = "TbChecksum";
+    public const string ChecksumTableName = "ChecksumConfig";
     private const string ChecksumBeanName = "ChecksumInfo";
 
     /// <summary>
     /// 创建虚拟的 Checksum 表定义
     /// </summary>
-    public static DefTable CreateChecksumTableDef(DefAssembly assembly)
+    /// <param name="assembly">DefAssembly 实例</param>
+    /// <param name="outputFile">输出文件名（不含扩展名），为 null 或空时使用默认命名规则</param>
+    public static DefTable CreateChecksumTableDef(DefAssembly assembly, string outputFile = null)
     {
         // 检查是否已经创建过
-        if (assembly.TablesByFullName.TryGetValue("TbChecksum", out var existingTable))
+        if (assembly.TablesByFullName.TryGetValue(ChecksumTableName, out var existingTable))
         {
             return existingTable;
         }
@@ -52,7 +54,7 @@ public static class ChecksumTableBuilder
             Namespace = "",
             Parent = "",
             Comment = "配置表校验和信息",
-            Groups = new List<string>(),  // Empty groups means export to all targets
+            Groups = new List<string>(),
             Fields = new List<RawField>
             {
                 new RawField
@@ -60,14 +62,14 @@ public static class ChecksumTableBuilder
                     Name = "TableName",
                     Type = "string",
                     Comment = "表名",
-                    Groups = new List<string>()  // Empty groups means export to all targets
+                    Groups = new List<string>()
                 },
                 new RawField
                 {
                     Name = "Checksum",
                     Type = "string",
                     Comment = "MD5校验和",
-                    Groups = new List<string>()  // Empty groups means export to all targets
+                    Groups = new List<string>()
                 }
             }
         };
@@ -84,18 +86,18 @@ public static class ChecksumTableBuilder
         defBean.PostCompile();
 
         // 2. 创建 Checksum 表定义
-        // 使用 Bean 的 FullName 作为 ValueType
         var rawTable = new RawTable
         {
             Name = ChecksumTableName,
             Namespace = "",
             Index = "TableName",
-            ValueType = defBean.FullName,  // 使用完整的 Bean 名称
+            ValueType = defBean.FullName,
             Mode = TableMode.LIST,
             Comment = "配置表校验和汇总表",
             InputFiles = new List<string> { "__checksum__" },
-            Groups = new List<string>()  // 空 Groups 表示对所有目标都导出
-            // 不设置 OutputFile，使用默认命名规则：TbChecksum -> tbchecksum.bytes
+            Groups = new List<string>(),
+            OutputFile = !string.IsNullOrWhiteSpace(outputFile) ? outputFile : null
+            // null 时使用默认命名规则：ChecksumConfig -> checksumconfig.bytes
         };
 
         var defTable = new DefTable(rawTable);
