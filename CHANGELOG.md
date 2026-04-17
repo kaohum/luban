@@ -1,5 +1,12 @@
 ## 变更日志
 
+### 2026-04-16
+
+- **checksum 输出文件名支持通过 xargs 配置**
+  - 新增 `checksumOutputFile` 配置项，支持自定义 checksum 数据文件的输出文件名。
+  - 用法：命令行 `-x checksumOutputFile=checksum`，或在 conf 配置的 xargs 中添加 `"checksumOutputFile=checksum"`。
+  - 不配置时使用默认命名规则（表名小写）：`ChecksumConfig -> checksumconfig.bytes`。
+
 ### 2026-03-27
 
 - **配置表MD5校验和功能**
@@ -25,6 +32,15 @@
 - **ref 校验：默认值跳过关联检查**
   - 修复当字段值为默认值（如 int 的 `0`、string 的空字符串等）时，ref 校验仍报错的问题。
   - 在 `RefValidator.Validate` 中增加前置判断：若字段值为默认值，直接跳过引用检查。
+
+### 2026-02-03
+
+- **拓展基础类型，支持 day/hour/minute/second/millisecond**
+  - 新增 5 种时间相关基础类型：`TDay`、`THour`、`TMinute`、`TSecond`、`TMillisecond`，对应数据类型 `DDay`、`DHour`、`DMinute`、`DSecond`、`DMillisecond`。
+  - 在配置表中可直接使用 `day`、`hour`、`minute`、`second`、`millisecond` 作为字段类型。
+  - 全面集成到所有数据加载器（Excel、JSON、XML、YAML、Lua、CSV）和数据导出器（Binary、JSON、XML、YAML、CSV、BSON、Protobuf 等）。
+  - 所有语言的代码生成器均已适配（C#、Java、C++、Go、Python、Lua、TypeScript、Rust、Dart、GDScript、JavaScript、PHP 等）。
+  - 支持所有 Visitor 模式的遍历（类型访问器、数据访问器）。
 
 ### 2026-02-02
 
