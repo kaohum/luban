@@ -50,20 +50,28 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
     public DType Accept(TBool type, ExcelStream x)
     {
 
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DBool.ValueOf(false);
         }
         return DBool.ValueOf(CreateBool(d));
     }
 
     public DType Accept(TByte type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DByte.Default;
         }
         if (!LoadDataUtil.TryParseExcelByteFromNumberOrConstAlias(d.ToString(), out byte v))
         {
@@ -74,10 +82,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TShort type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DShort.Default;
         }
         if (!LoadDataUtil.TryParseExcelShortFromNumberOrConstAlias(d.ToString(), out short v))
         {
@@ -88,10 +100,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TInt type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DInt.Default;
         }
         var ds = d.ToString();
         //if (field?.Remapper is TEnum te)
@@ -110,10 +126,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TLong type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DLong.Default;
         }
         var ds = d.ToString();
         //if (field?.Remapper is TEnum te)
@@ -132,10 +152,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TFloat type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DFloat.Default;
         }
         if (!float.TryParse(d.ToString(), out var v))
         {
@@ -146,10 +170,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TDouble type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            return DDouble.Default;
         }
         if (!double.TryParse(d.ToString(), out var v))
         {
@@ -160,7 +188,7 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TEnum type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
@@ -174,7 +202,7 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TString type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         var s = SheetDataCreator.ParseString(d, type.IsNullable);
         if (s == null)
         {
@@ -189,10 +217,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TDateTime type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            throw new InvalidExcelDataException($"字段不能为空");
         }
         if (d is System.DateTime datetime)
         {
@@ -203,50 +235,70 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
 
     public DType Accept(TDay type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            d = "0";
         }
         return DataUtil.CreateDay(d.ToString());
     }
 
     public DType Accept(THour type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            d = "0";
         }
         return DataUtil.CreateHour(d.ToString());
     }
 
     public DType Accept(TMinute type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            d = "0";
         }
         return DataUtil.CreateMinute(d.ToString());
     }
 
     public DType Accept(TSecond type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            d = "0";
         }
         return DataUtil.CreateSecond(d.ToString());
     }
 
     public DType Accept(TMillisecond type, ExcelStream x)
     {
-        var d = x.Read();
+        var d = x.Read(true);
         if (CheckNull(type.IsNullable, d))
         {
             return null;
+        }
+        if (d == null)
+        {
+            d = "0";
         }
         return DataUtil.CreateMillisecond(d.ToString());
     }

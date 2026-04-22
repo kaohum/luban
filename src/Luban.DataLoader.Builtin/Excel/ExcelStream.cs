@@ -83,9 +83,17 @@ public class ExcelStream
                         this._datas.Add(cell);
                     }
                 }
-                else if (!string.IsNullOrEmpty(_overrideDefault))
+                else
                 {
-                    this._datas.Add(new Cell(cell.Row, cell.Column, _overrideDefault));
+                    // 空 cell：有 overrideDefault 时用默认值，否则保留空位
+                    if (!string.IsNullOrEmpty(_overrideDefault))
+                    {
+                        this._datas.Add(new Cell(cell.Row, cell.Column, _overrideDefault));
+                    }
+                    else
+                    {
+                        this._datas.Add(cell);
+                    }
                 }
             }
             this._curIndex = 0;
@@ -109,7 +117,7 @@ public class ExcelStream
             {
                 if (d is string s)
                 {
-                    this._datas.AddRange(LoadDataUtil.SplitStringByAnySepChar(s, sep).Where(x => !IsSkip(x)).Select(x => new Cell(cell.Row, cell.Column, x)));
+                    this._datas.AddRange(LoadDataUtil.SplitStringByAnySepChar(s, sep).Select(x => new Cell(cell.Row, cell.Column, x)));
                 }
                 else
                 {
@@ -162,9 +170,17 @@ public class ExcelStream
                             this._datas.Add(cell);
                         }
                     }
-                    else if (!string.IsNullOrEmpty(_overrideDefault))
+                    else
                     {
-                        this._datas.Add(new Cell(cell.Row, cell.Column, _overrideDefault));
+                        // 空 cell，如果有 overrideDefault 则使用，否则保留空位
+                        if (!string.IsNullOrEmpty(_overrideDefault))
+                        {
+                            this._datas.Add(new Cell(cell.Row, cell.Column, _overrideDefault));
+                        }
+                        else
+                        {
+                            this._datas.Add(cell);
+                        }
                     }
                 }
             }
