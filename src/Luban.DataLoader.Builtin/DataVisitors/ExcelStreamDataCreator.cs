@@ -258,15 +258,14 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
         {
             try
             {
-                //string sep = f.Tags.TryGetValue("tag", out var s) ? s : null;
-                //if (string.IsNullOrWhiteSpace(sep))
-                //{
-                list.Add(f.CType.Apply(this, stream));
-                //}
-                //else
-                //{
-                //    list.Add(f.CType.Apply(this, new ExcelStream(stream.ReadCell(), sep)));
-                //}
+                if (!stream.TryPeek(out _))
+                {
+                    list.Add(f.CType.Apply(DefaultDataCreator.Ins));
+                }
+                else
+                {
+                    list.Add(f.CType.Apply(this, stream));
+                }
             }
             catch (DataCreateException dce)
             {

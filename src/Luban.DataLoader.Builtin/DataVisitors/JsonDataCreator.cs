@@ -156,7 +156,7 @@ public class JsonDataCreator : ITypeFuncVisitor<JsonElement, DefAssembly, DType>
             }
             else
             {
-                throw new Exception($"结构:'{implBean.FullName}' 字段:'{f.CurrentVariantNameWithFieldNameOrOrigin}' 缺失");
+                fields.Add(f.CType.Apply(DefaultDataCreator.Ins));
             }
         }
         return new DBean(type, implBean, fields);

@@ -407,7 +407,9 @@ class SheetDataCreator : ITypeFuncVisitor<RowColumnSheet, TitleRow, DType>
             string fname = f.Name;
             if (!TryGetBeanField(row, f, out var field))
             {
-                throw new Exception($"bean:'{bean.FullName}' 缺失 列:'{fname}'，请检查是否写错或者遗漏");
+                s_logger.Info("bean:'{0}' 列:'{1}' 缺失，使用默认值", bean.FullName, fname);
+                list.Add(f.CType.Apply(DefaultDataCreator.Ins));
+                continue;
             }
             try
             {
