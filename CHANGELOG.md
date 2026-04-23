@@ -1,5 +1,17 @@
 ## 变更日志
 
+### 2026-04-23
+
+- **自定义 bean 类型支持部分填充（默认值补全）**
+  - 当配置表中自定义 bean 类型字段未完全填写时，未填字段自动使用其类型的默认值填充。
+  - 例如：`CustomBean` 含有 4 个字段 `Id(int), Type(enum), Num(int), Value(string)`，sep=`,`。如果只配置 `"0"`，则后 3 个字段分别取枚举 0 默认值、int 默认值 `0`、string 默认值 `""`。
+  - 新增 `DefaultDataCreator` visitor，为所有类型（包括嵌套 bean）生成默认值，递归处理嵌套结构。
+  - 支持全部数据格式：Excel/CSV、JSON、Lua/XML 及 Stream 格式。
+  - 中间空位处理：配置如 `"0,,hello"` 时，中间空位也填默认值，不会导致字段错位。
+  - 多态 bean 不支持部分填充，保持现有行为（类型标识缺失时报错）。
+  - Nullable 字段缺失时返回 `null`，而非类型默认值。
+  - SheetDataCreator 在缺失列时会记录 Info 级别日志。
+
 ### 2026-04-16
 
 - **checksum 输出文件名支持通过 xargs 配置**
