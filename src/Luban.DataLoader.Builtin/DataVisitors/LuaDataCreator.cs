@@ -39,16 +39,48 @@ class LuaDataCreator : ITypeFuncVisitor<object, DefAssembly, DType>
 
     public DType Accept(TByte type, object x, DefAssembly ass)
     {
+        if (x is int ni)
+        {
+            return DByte.ValueOf((byte)ni);
+        }
+        if (x is string s && ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            if (enumValue < byte.MinValue || enumValue > byte.MaxValue)
+            {
+                throw new Exception($"枚举值 '{s}' 的值 {enumValue} 超出 byte 范围 ({byte.MinValue}..{byte.MaxValue})");
+            }
+            return DByte.ValueOf((byte)enumValue);
+        }
         return DByte.ValueOf((byte)(int)x);
     }
 
     public DType Accept(TShort type, object x, DefAssembly ass)
     {
+        if (x is int ni)
+        {
+            return DShort.ValueOf((short)ni);
+        }
+        if (x is string s && ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            if (enumValue < short.MinValue || enumValue > short.MaxValue)
+            {
+                throw new Exception($"枚举值 '{s}' 的值 {enumValue} 超出 short 范围 ({short.MinValue}..{short.MaxValue})");
+            }
+            return DShort.ValueOf((short)enumValue);
+        }
         return DShort.ValueOf((short)(int)x);
     }
 
     public DType Accept(TInt type, object x, DefAssembly ass)
     {
+        if (x is int ni)
+        {
+            return DInt.ValueOf(ni);
+        }
+        if (x is string s && ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            return DInt.ValueOf(enumValue);
+        }
         return DInt.ValueOf((int)x);
     }
 
@@ -90,6 +122,10 @@ class LuaDataCreator : ITypeFuncVisitor<object, DefAssembly, DType>
 
     public DType Accept(TLong type, object x, DefAssembly ass)
     {
+        if (x is string s && ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            return DLong.ValueOf(enumValue);
+        }
         return DLong.ValueOf(ToLong(x));
     }
 
