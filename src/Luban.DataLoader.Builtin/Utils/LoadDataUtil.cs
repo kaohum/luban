@@ -305,6 +305,15 @@ static class LoadDataUtil
         {
             return true;
         }
+        if (assembly.TryResolveEnumValue(s, out var enumValue))
+        {
+            if (enumValue < byte.MinValue || enumValue > byte.MaxValue)
+            {
+                throw new Exception($"枚举值 '{s}' 的值 {enumValue} 超出 byte 范围 ({byte.MinValue}..{byte.MaxValue})");
+            }
+            value = (byte)enumValue;
+            return true;
+        }
         return false;
     }
 
@@ -318,6 +327,15 @@ static class LoadDataUtil
         DefAssembly assembly = GenerationContext.Current.Assembly;
         if (assembly.TryGetConstAlias(s, out var constValue) && short.TryParse(constValue, out value))
         {
+            return true;
+        }
+        if (assembly.TryResolveEnumValue(s, out var enumValue))
+        {
+            if (enumValue < short.MinValue || enumValue > short.MaxValue)
+            {
+                throw new Exception($"枚举值 '{s}' 的值 {enumValue} 超出 short 范围 ({short.MinValue}..{short.MaxValue})");
+            }
+            value = (short)enumValue;
             return true;
         }
         return false;
@@ -339,6 +357,10 @@ static class LoadDataUtil
         {
             return true;
         }
+        if (assembly.TryResolveEnumValue(s, out value))
+        {
+            return true;
+        }
         return false;
     }
 
@@ -352,6 +374,11 @@ static class LoadDataUtil
         DefAssembly assembly = GenerationContext.Current.Assembly;
         if (assembly.TryGetConstAlias(s, out var constValue) && long.TryParse(constValue, out value))
         {
+            return true;
+        }
+        if (assembly.TryResolveEnumValue(s, out var enumValue))
+        {
+            value = enumValue;
             return true;
         }
         return false;
