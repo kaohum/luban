@@ -38,21 +38,61 @@ public class JsonDataCreator : ITypeFuncVisitor<JsonElement, DefAssembly, DType>
 
     public DType Accept(TByte type, JsonElement x, DefAssembly ass)
     {
+        if (x.ValueKind == JsonValueKind.Number)
+        {
+            return DByte.ValueOf(x.GetByte());
+        }
+        if (x.ValueKind == JsonValueKind.String && ass.TryResolveEnumValue(x.GetString(), out var enumValue))
+        {
+            if (enumValue < byte.MinValue || enumValue > byte.MaxValue)
+            {
+                throw new Exception($"枚举值 '{x.GetString()}' 的值 {enumValue} 超出 byte 范围 ({byte.MinValue}..{byte.MaxValue})");
+            }
+            return DByte.ValueOf((byte)enumValue);
+        }
         return DByte.ValueOf(x.GetByte());
     }
 
     public DType Accept(TShort type, JsonElement x, DefAssembly ass)
     {
+        if (x.ValueKind == JsonValueKind.Number)
+        {
+            return DShort.ValueOf(x.GetInt16());
+        }
+        if (x.ValueKind == JsonValueKind.String && ass.TryResolveEnumValue(x.GetString(), out var enumValue))
+        {
+            if (enumValue < short.MinValue || enumValue > short.MaxValue)
+            {
+                throw new Exception($"枚举值 '{x.GetString()}' 的值 {enumValue} 超出 short 范围 ({short.MinValue}..{short.MaxValue})");
+            }
+            return DShort.ValueOf((short)enumValue);
+        }
         return DShort.ValueOf(x.GetInt16());
     }
 
     public DType Accept(TInt type, JsonElement x, DefAssembly ass)
     {
+        if (x.ValueKind == JsonValueKind.Number)
+        {
+            return DInt.ValueOf(x.GetInt32());
+        }
+        if (x.ValueKind == JsonValueKind.String && ass.TryResolveEnumValue(x.GetString(), out var enumValue))
+        {
+            return DInt.ValueOf(enumValue);
+        }
         return DInt.ValueOf(x.GetInt32());
     }
 
     public DType Accept(TLong type, JsonElement x, DefAssembly ass)
     {
+        if (x.ValueKind == JsonValueKind.Number)
+        {
+            return DLong.ValueOf(x.GetInt64());
+        }
+        if (x.ValueKind == JsonValueKind.String && ass.TryResolveEnumValue(x.GetString(), out var enumValue))
+        {
+            return DLong.ValueOf(enumValue);
+        }
         return DLong.ValueOf(x.GetInt64());
     }
 
