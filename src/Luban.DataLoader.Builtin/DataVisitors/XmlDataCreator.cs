@@ -38,22 +38,66 @@ class XmlDataCreator : ITypeFuncVisitor<XElement, DefAssembly, DType>
 
     public DType Accept(TByte type, XElement x, DefAssembly ass)
     {
-        return DByte.ValueOf(byte.Parse(x.Value.Trim()));
+        var s = x.Value.Trim();
+        if (byte.TryParse(s, out byte v))
+        {
+            return DByte.ValueOf(v);
+        }
+        if (ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            if (enumValue < byte.MinValue || enumValue > byte.MaxValue)
+            {
+                throw new Exception($"枚举值 '{s}' 的值 {enumValue} 超出 byte 范围 ({byte.MinValue}..{byte.MaxValue})");
+            }
+            return DByte.ValueOf((byte)enumValue);
+        }
+        return DByte.ValueOf(byte.Parse(s));
     }
 
     public DType Accept(TShort type, XElement x, DefAssembly ass)
     {
-        return DShort.ValueOf(short.Parse(x.Value.Trim()));
+        var s = x.Value.Trim();
+        if (short.TryParse(s, out short v))
+        {
+            return DShort.ValueOf(v);
+        }
+        if (ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            if (enumValue < short.MinValue || enumValue > short.MaxValue)
+            {
+                throw new Exception($"枚举值 '{s}' 的值 {enumValue} 超出 short 范围 ({short.MinValue}..{short.MaxValue})");
+            }
+            return DShort.ValueOf((short)enumValue);
+        }
+        return DShort.ValueOf(short.Parse(s));
     }
 
     public DType Accept(TInt type, XElement x, DefAssembly ass)
     {
-        return DInt.ValueOf(int.Parse(x.Value.Trim()));
+        var s = x.Value.Trim();
+        if (int.TryParse(s, out int v))
+        {
+            return DInt.ValueOf(v);
+        }
+        if (ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            return DInt.ValueOf(enumValue);
+        }
+        return DInt.ValueOf(int.Parse(s));
     }
 
     public DType Accept(TLong type, XElement x, DefAssembly ass)
     {
-        return DLong.ValueOf(long.Parse(x.Value.Trim()));
+        var s = x.Value.Trim();
+        if (long.TryParse(s, out long v))
+        {
+            return DLong.ValueOf(v);
+        }
+        if (ass.TryResolveEnumValue(s, out var enumValue))
+        {
+            return DLong.ValueOf(enumValue);
+        }
+        return DLong.ValueOf(long.Parse(s));
     }
 
     public DType Accept(TFloat type, XElement x, DefAssembly ass)
