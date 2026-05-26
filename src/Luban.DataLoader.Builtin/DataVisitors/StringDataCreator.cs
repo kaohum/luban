@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Luban;
 using Luban.Datas;
 using Luban.Types;
 using Luban.TypeVisitors;
@@ -47,10 +48,16 @@ class StringDataCreator : ITypeFuncVisitor<string, DType>
         {
             return DByte.ValueOf(b);
         }
-        else
+        var assembly = GenerationContext.Current.Assembly;
+        if (assembly.TryResolveEnumValue(x, out var enumValue))
         {
-            throw new Exception($"{x} 不是byte类型");
+            if (enumValue < byte.MinValue || enumValue > byte.MaxValue)
+            {
+                throw new Exception($"枚举值 '{x}' 的值 {enumValue} 超出 byte 范围 ({byte.MinValue}..{byte.MaxValue})");
+            }
+            return DByte.ValueOf((byte)enumValue);
         }
+        throw new Exception($"{x} 不是byte类型，也不是有效的枚举值名");
     }
 
     public DType Accept(TShort type, string x)
@@ -59,10 +66,16 @@ class StringDataCreator : ITypeFuncVisitor<string, DType>
         {
             return DShort.ValueOf(b);
         }
-        else
+        var assembly = GenerationContext.Current.Assembly;
+        if (assembly.TryResolveEnumValue(x, out var enumValue))
         {
-            throw new Exception($"{x} 不是short类型");
+            if (enumValue < short.MinValue || enumValue > short.MaxValue)
+            {
+                throw new Exception($"枚举值 '{x}' 的值 {enumValue} 超出 short 范围 ({short.MinValue}..{short.MaxValue})");
+            }
+            return DShort.ValueOf((short)enumValue);
         }
+        throw new Exception($"{x} 不是short类型，也不是有效的枚举值名");
     }
 
     public DType Accept(TInt type, string x)
@@ -71,10 +84,12 @@ class StringDataCreator : ITypeFuncVisitor<string, DType>
         {
             return DInt.ValueOf(b);
         }
-        else
+        var assembly = GenerationContext.Current.Assembly;
+        if (assembly.TryResolveEnumValue(x, out var enumValue))
         {
-            throw new Exception($"{x} 不是int类型");
+            return DInt.ValueOf(enumValue);
         }
+        throw new Exception($"{x} 不是int类型，也不是有效的枚举值名");
     }
 
     public DType Accept(TLong type, string x)
@@ -83,10 +98,12 @@ class StringDataCreator : ITypeFuncVisitor<string, DType>
         {
             return DLong.ValueOf(b);
         }
-        else
+        var assembly = GenerationContext.Current.Assembly;
+        if (assembly.TryResolveEnumValue(x, out var enumValue))
         {
-            throw new Exception($"{x} 不是long类型");
+            return DLong.ValueOf(enumValue);
         }
+        throw new Exception($"{x} 不是long类型，也不是有效的枚举值名");
     }
 
     public DType Accept(TFloat type, string x)
