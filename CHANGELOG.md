@@ -1,5 +1,16 @@
 ## 变更日志
 
+### 2026-05-26
+
+- **整数字段支持填写枚举值名（反向索引）**
+  - 所有整数类型字段（byte、short、int、long）现在支持直接填写枚举值名，系统自动在所有枚举中反向查找对应的 int 值。
+  - 例如：字段类型为 `int` 时，可以填写 `Orange`，系统会自动查找到 `ColorType.Orange = 4`。
+  - 支持通过 `枚举名.值名` 完整格式消除歧义，例如 `ColorType.Orange`。
+  - 当多个枚举包含同名值时，报错并提示使用完整格式消歧。
+  - 支持所有数据源：Excel/CSV、JSON、XML、YAML、Lua、String。
+  - 普通字段和 bean 内字段均支持。
+  - 修改文件：`DefAssembly.cs`、`LoadDataUtil.cs`、`JsonDataCreator.cs`、`XmlDataCreator.cs`、`YamlDataCreator.cs`、`LuaDataCreator.cs`、`StringDataCreator.cs`。
+
 ### 2026-04-23
 
 - **自定义 bean 类型支持部分填充（默认值补全）**
