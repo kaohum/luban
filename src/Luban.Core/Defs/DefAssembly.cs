@@ -36,6 +36,8 @@ public class DefAssembly
 
     private readonly Dictionary<string, string> _constAliases = new();
 
+    private readonly Dictionary<string, List<(DefEnum Enum, int Value)>> _enumNameReverseIndex = new();
+
     private readonly HashSet<string> _namespaces = new();
 
     private readonly Dictionary<string, DefTypeBase> _notCaseSenseNamespaces = new();
@@ -84,6 +86,78 @@ public class DefAssembly
     public bool TryGetConstAlias(string alias, out string value)
     {
         return _constAliases.TryGetValue(alias, out value);
+    }
+
+    private void BuildEnumNameReverseIndex()
+    {
+        foreach (var type in TypeList)
+        {
+            if (type is not DefEnum defEnum)
+            {
+                continue;
+            }
+            foreach (var item in defEnum.Items)
+            {
+                if (!string.IsNullOrWhiteSpace(item.Name))
+                {
+                    if (!_enumNameReverseIndex.TryGetValue(item.Name, out var list))
+                    {
+                        list = new List<(DefEnum, int)>();
+                        _enumNameReverseIndex[item.Name] = list;
+                    }
+                    list.Add((defEnum, item.IntValue));
+                }
+                if (!string.IsNullOrWhiteSpace(item.Alias))
+                {
+                    if (!_enumNameReverseIndex.TryGetValue(item.Alias, out var list))
+                    {
+                        list = new List<(DefEnum, int)>();
+                        _enumNameReverseIndex[item.Alias] = list;
+                    }
+                    list.Add((defEnum, item.IntValue));
+                }
+            }
+        }
+    }
+
+    public bool TryResolveEnumValue(string name, out int value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        int dotIndex = name.IndexOf('.');
+        if (dotIndex > 0 && dotIndex < name.Length - 1)
+        {
+            string enumName = name.Substring(0, dotIndex);
+            string valueName = name.Substring(dotIndex + 1);
+            foreach (var type in TypeList)
+            {
+                if (type is DefEnum defEnum && (defEnum.Name == enumName || defEnum.FullName == enumName))
+                {
+                    if (defEnum.TryValueByNameOrAlias(valueName, out value))
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        if (!_enumNameReverseIndex.TryGetValue(name, out var matches))
+        {
+            return false;
+        }
+        if (matches.Count == 1)
+        {
+            value = matches[0].Value;
+            return true;
+        }
+        var enumNames = string.Join(", ", matches.Select(m => m.Enum.Name).Distinct());
+        throw new Exception($"枚举值 '{name}' 存在歧义，匹配到多个枚举类型：{enumNames}。请使用完整格式如 '{matches[0].Enum.Name}.{name}' 来消除歧义");
     }
 
     public DefAssembly(RawAssembly assembly, string target, List<string> outputTables, List<RawGroup> groupDefs, Dictionary<string, string> variants)
@@ -177,6 +251,8 @@ public class DefAssembly
         {
             type.PostCompile();
         }
+
+        BuildEnumNameReverseIndex();
     }
 
     public bool NeedExport(List<string> groups, List<RawGroup> groupDefs)
