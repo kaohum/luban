@@ -32,7 +32,7 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
     {
         // 确保可访问数据
         ctx.LoadDatas();
-        var keys = ctx.GetL10NKeyInfos();
+        var keys = GetCodeL10NKeys(ctx);
         var keyType = keys.Item2;
         if (keyType == null)
         {
@@ -59,6 +59,35 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
         writer.Write(template.Render(tplCtx));
 
         manifest.AddFile(CreateOutputFile($"{className}.cs", writer.ToResult(FileHeader)));
+    }
+
+    /// <summary>
+    /// 解析 cs-l10n-language.keyTable 配置：
+    /// - 配置时：只从指定的“代码引用语言表”枚举 key（静态字段只覆盖该表）。
+    /// - 未配置时：枚举全部导出表，保持原行为。
+    /// </summary>
+    private (IReadOnlyList<L10NKeyInfo>, System.Type) GetCodeL10NKeys(GenerationContext ctx)
+    {
+        string keyTable = EnvManager.Current.GetOptionOrDefault(Name, "keyTable", false, null);
+        if (string.IsNullOrWhiteSpace(keyTable))
+        {
+            return ctx.GetL10NKeyInfos();
+        }
+
+        var matched = ctx.ExportTables.Where(t =>
+            string.Equals(t.Name, keyTable, StringComparison.Ordinal) ||
+            string.Equals(t.FullName, keyTable, StringComparison.Ordinal) ||
+            t.FullName.EndsWith("." + keyTable, StringComparison.Ordinal)).ToList();
+
+        if (matched.Count == 0)
+        {
+            var available = string.Join(", ", ctx.ExportTables.Select(t => t.FullName));
+            throw new Exception(
+                $"[cs-l10n-language] keyTable='{keyTable}' 未匹配到任何导出表。" +
+                $"请检查 language schema 中的 table 定义或 lang.conf 中 cs-l10n-language.keyTable 配置。当前可用表：{available}");
+        }
+
+        return ctx.GetL10NKeyInfos(matched);
     }
 }
 

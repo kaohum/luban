@@ -1,5 +1,15 @@
 ## 变更日志
 
+### 2026-06-13
+
+- **多语言支持多表合并导出与按表过滤静态字段**
+  - `l10n-bin-split` 数据导出器新增 `l10n.mergeOutput` 配置：把多张 l10n 表的记录按语言合并导出单一 bin（如 `languageconfig.bytes`），未配置时保持原逐表行为（向后兼容）。跨表重复 key 立即抛异常，作为防漂移安全阀。
+  - `cs-l10n-language` 代码目标新增 `cs-l10n-language.keyTable` 配置：静态字段仅从指定 l10n 表枚举（不写缓存）。未配置时保持原行为（枚举全部表）。keyTable 匹配支持简单名、FullName 或模块前缀后缀形式（如 `LanguageCode` 匹配 `Table.LanguageCode`）。
+  - `DefaultTextProvider` 支持 `l10n.textFile.path` 分号分隔的多个文件做 key 合法性校验，跨文件重复 key 由现有 `TryAdd` 机制报错兜底。
+  - `GenerationContext.GetL10NKeyInfos` 重构：抽取内部枚举逻辑为 `EnumerateL10NKeys(IReadOnlyList<DefTable>)`，新增 `GetL10NKeyInfos(IReadOnlyList<DefTable>)` 重载（不写缓存），原无参方法缓存 ExportTables 结果不变。
+  - 移除 `Templates/cs-l10n-language/language.sbn` 里 `if $index > 3000 break` 的硬上限（曾静默丢弃超 3000 个 key）。
+  - 修改文件：`Luban.DataTarget.Builtin/L10NBinarySplitDataExporter.cs`、`Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`、`Luban.L10N/DefaultTextProvider.cs`、`Luban.Core/GenerationContext.cs`。
+
 ### 2026-05-26
 
 - **整数字段支持填写枚举值名（反向索引）**

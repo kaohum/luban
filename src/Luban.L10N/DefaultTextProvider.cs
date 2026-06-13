@@ -67,8 +67,13 @@ public class DefaultTextProvider : ITextProvider
             }
         }
 
-        string textProviderFile = env.GetOption(BuiltinOptionNames.L10NFamily, BuiltinOptionNames.L10NTextFilePath, false);
-        LoadTextListFromFile(textProviderFile);
+        string textProviderFiles = env.GetOption(BuiltinOptionNames.L10NFamily, BuiltinOptionNames.L10NTextFilePath, false);
+        // 支持分号分隔的多个文件：多张语言表（如代码引用表 + 策划文本表）合并作为 key 合法性校验源。
+        // _texts 在本方法开头已清空，逐文件追加；跨文件重复 key 由 LoadTextListFromFile 内的 TryAdd 报错兜底。
+        foreach (var file in textProviderFiles.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            LoadTextListFromFile(file);
+        }
     }
 
     public bool ConvertTextKeyToValue => _convertTextKeyToValue;

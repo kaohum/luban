@@ -352,9 +352,29 @@ public class GenerationContext
             return (_l10nKeyInfos, typeof(int));
         }
 
+        var (keys, keyType) = EnumerateL10NKeys(ExportTables);
+        _l10nKeyInfos = keys;
+        return (_l10nKeyInfos, keyType);
+    }
+
+    /// <summary>
+    /// 仅枚举指定表集合的 l10n key（不写缓存）。
+    /// 用于代码生成时只从“代码引用语言表”取 key，而非全部语言表。
+    /// </summary>
+    public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos(IReadOnlyList<DefTable> tables)
+    {
         if (!DatasLoaded || L10NLanguages.Count == 0)
         {
             return (Array.Empty<L10NKeyInfo>(), typeof(int));
+        }
+        return EnumerateL10NKeys(tables);
+    }
+
+    private (List<L10NKeyInfo>, System.Type) EnumerateL10NKeys(IReadOnlyList<DefTable> tables)
+    {
+        if (!DatasLoaded || L10NLanguages.Count == 0)
+        {
+            return (new List<L10NKeyInfo>(), typeof(int));
         }
 
         var keyFieldName = L10NTextKeyFieldName;
@@ -364,7 +384,7 @@ public class GenerationContext
         var keySet = new HashSet<object>();
         System.Type keyType = null;
 
-        foreach (var table in ExportTables)
+        foreach (var table in tables)
         {
             if (table.ValueTType is not TBean tbean)
             {
@@ -376,12 +396,12 @@ public class GenerationContext
             {
                 continue;
             }
-            
+
             if (!_recordsByTables.TryGetValue(table.FullName, out var tableDataInfo) || tableDataInfo.FinalRecords == null)
             {
                 continue;
             }
-            
+
             var hasDesc = HasStringField(bean, keyFieldDesc);
 
             foreach (var record in tableDataInfo.FinalRecords)
@@ -410,15 +430,14 @@ public class GenerationContext
                         {
                             descContent = descValue.Value;
                         }
-                    }        
+                    }
                     keys.Add((keyValue.GetValueObject(), descContent));
                 }
             }
         }
 
         //keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));
-        _l10nKeyInfos = BuildL10NKeyInfos(keys);
-        return (_l10nKeyInfos, keyType);
+        return (BuildL10NKeyInfos(keys), keyType);
     }
 
     private void AddChildrenByOrder(List<DefBean> list, DefBean bean)
