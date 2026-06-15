@@ -21,6 +21,8 @@
 using Luban.Defs;
 using Luban.RawDefs;
 using Luban.Utils;
+using System.IO;
+using System.Text.RegularExpressions;
 
 namespace Luban.Schema.Builtin;
 
@@ -29,6 +31,31 @@ public static class SchemaLoaderUtil
     public static List<string> CreateGroups(string s)
     {
         return s.Split(',', ';').Select(x => x.Trim()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+    }
+
+    private static readonly Regex s_identifierRegex = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$");
+
+    // 合法标识符校验：以字母或下划线开头，仅由字母、数字、下划线组成
+    public static bool IsValidIdentifier(string name)
+    {
+        return !string.IsNullOrEmpty(name) && s_identifierRegex.IsMatch(name);
+    }
+
+    // 从 input 列（可逗号分隔、含 @sheet 语法）取第一个数据文件的文件名（去路径与扩展名）。
+    // 复用 FileUtil.SplitFileAndSheetName，与 DataLoaderManager 解析 input 的方式保持一致。
+    public static string GetFirstFileBaseName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return "";
+        }
+        string first = input.Split(',', ';')[0].Trim();
+        if (string.IsNullOrWhiteSpace(first))
+        {
+            return "";
+        }
+        var (file, _) = FileUtil.SplitFileAndSheetName(FileUtil.Standardize(first));
+        return Path.GetFileNameWithoutExtension(file);
     }
 
     public static RawTable CreateTable(string schemaFile, string name, string module, string valueType, string index, string mode, string group,

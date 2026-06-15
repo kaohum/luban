@@ -1,5 +1,19 @@
 ## 变更日志
 
+### 2026-06-15
+
+- **元表 table 定义支持按 input 文件名推断 full_name / value_type**
+  - 元表（`__tables__`）某行若未配置 `full_name` 或 `value_type`，自动按该行 `input` 第一个数据文件名推断：`full_name = 文件名 + "Config"`，`value_type = 文件名`。推断值与手动填入同值走完全相同的后续流程（命名空间、`read_schema_from_file` 等一致），向后兼容——已填写的行不受影响。
+  - 文件名需为合法标识符（`^[A-Za-z_][A-Za-z0-9_]*$`），否则报错提示；`input` 为空无法推断时也报错。
+  - 为支持 `full_name`/`value_type` 可空：`__TableRecord__` 这两个字段改为 `string?`；`SheetDataCreator.Accept(TString)` 的 non_empty 校验放宽为仅对非空类型生效（可空字段允许留空）——对存量表无影响（主键/首列均为非空类型）。
+  - 新增工具方法 `SchemaLoaderUtil.IsValidIdentifier`、`GetFirstFileBaseName`（复用 `FileUtil.SplitFileAndSheetName`，与数据加载解析 input 的方式一致）。
+  - 修改文件：`Luban.Schema.Builtin/ExcelSchemaLoader.cs`、`Luban.Schema.Builtin/SchemaLoaderUtil.cs`、`Luban.DataLoader.Builtin/DataVisitors/SheetDataCreator.cs`。
+
+- **day/hour/minute/second 负值原样导出（哨兵值）**
+  - `day`/`hour`/`minute`/`second` 类型填写负值时，按填写值原样导出，不再转换为毫秒。例如 `hour` 填 `-1` 导出 `-1`（而非 `-3600000`），用于 `-1` 等哨兵值。非负值仍照常转换为毫秒（向后兼容）。
+  - `millisecond` 本身无转换、`datetime` 为独立概念，均不受影响。
+  - 修改文件：`Luban.Core/Datas/DDay.cs`、`DHour.cs`、`DMinute.cs`、`DSecond.cs`、`docs/时间类型使用文档.md`。
+
 ### 2026-06-13
 
 - **多语言支持多表合并导出与按表过滤静态字段**

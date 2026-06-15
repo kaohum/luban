@@ -275,7 +275,7 @@ class SheetDataCreator : ITypeFuncVisitor<RowColumnSheet, TitleRow, DType>
     public DType Accept(TString type, RowColumnSheet sheet, TitleRow row)
     {
         object x = row.Current;
-        if (CheckDefault(x))
+        if (CheckDefault(x) && !type.IsNullable)
         {
             ThrowIfNonEmpty(row);
         }

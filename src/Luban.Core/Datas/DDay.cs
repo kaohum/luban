@@ -31,7 +31,8 @@ public class DDay : DType
 
     public DDay(long days)
     {
-        this.Value = days * 24 * 60 * 60 * 1000L; // 转换为毫秒
+        // 负值视为哨兵值，按填写值原样保留不转换为毫秒；非负值才转换为毫秒
+        this.Value = days < 0 ? days : days * 24 * 60 * 60 * 1000L;
     }
 
     public override bool Equals(object obj)

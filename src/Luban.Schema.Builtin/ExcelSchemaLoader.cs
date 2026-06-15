@@ -67,8 +67,8 @@ public class ExcelSchemaLoader : SchemaLoaderBase
             Sep = "",
             Fields = new List<RawField>
             {
-                new() { Name = "full_name", Type = "string" },
-                new() { Name = "value_type", Type = "string" },
+                new() { Name = "full_name", Type = "string?" },
+                new() { Name = "value_type", Type = "string?" },
                 new() { Name = "index", Type = "string" },
                 new() { Name = "mode", Type = "string" },
                 new() { Name = "group", Type = "string" },
@@ -96,14 +96,39 @@ public class ExcelSchemaLoader : SchemaLoaderBase
         {
             DBean data = r.Data;
             //s_logger.Info("== read text:{}", r.Data);
-            string fullName = (data.GetField("full_name") as DString).Value.Trim();
+            string fullName = (data.GetField("full_name") as DString)?.Value?.Trim() ?? "";
+            string valueType = (data.GetField("value_type") as DString)?.Value?.Trim() ?? "";
+            string inputFile = (data.GetField("input") as DString).Value.Trim();
+
+            // full_name / value_type 为空时，按 input 第一个数据文件名推断；
+            // 推断值与手填同值走完全相同的后续流程，不额外处理命名空间
+            if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(valueType))
+            {
+                string fileBaseName = SchemaLoaderUtil.GetFirstFileBaseName(inputFile);
+                if (string.IsNullOrWhiteSpace(fileBaseName))
+                {
+                    throw new Exception($"file:{actualFile} full_name 或 value_type 为空，且无法从 input 推断文件名（input:'{inputFile}' 为空）。请显式填写 full_name/value_type");
+                }
+                if (!SchemaLoaderUtil.IsValidIdentifier(fileBaseName))
+                {
+                    throw new Exception($"file:{actualFile} 无法从 input 推断：文件名 '{fileBaseName}' 不是合法标识符（需以字母/下划线开头，仅含字母/数字/下划线）。请显式填写 full_name/value_type 或重命名数据文件");
+                }
+                if (string.IsNullOrWhiteSpace(fullName))
+                {
+                    fullName = fileBaseName + "Config";
+                }
+                if (string.IsNullOrWhiteSpace(valueType))
+                {
+                    valueType = fileBaseName;
+                }
+            }
+
             string name = TypeUtil.GetName(fullName);
-            if (string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(name))
+            if (string.IsNullOrWhiteSpace(name))
             {
                 throw new Exception($"file:{actualFile} 定义了一个空的table类名");
             }
             string module = TypeUtil.GetNamespace(fullName);
-            string valueType = (data.GetField("value_type") as DString).Value.Trim();
             string index = (data.GetField("index") as DString).Value.Trim();
             string mode = (data.GetField("mode") as DString).Value.Trim();
             string group = (data.GetField("group") as DString).Value.Trim();
@@ -113,7 +138,6 @@ public class ExcelSchemaLoader : SchemaLoaderBase
             {
                 valueType = TypeUtil.MakeFullName(module, valueType);
             }
-            string inputFile = (data.GetField("input") as DString).Value.Trim();
             // string patchInput = (data.GetField("patch_input") as DString).Value.Trim();
             string tags = (data.GetField("tags") as DString).Value.Trim();
             string outputFile = (data.GetField("output") as DString).Value.Trim();
