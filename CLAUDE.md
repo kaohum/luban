@@ -108,3 +108,13 @@ Code generation uses [Scriban](https://github.com/scriban/scriban) (`.sbn` files
 - **NLog** 5.3.4 — logging
 - **Scriban** 5.12.0 — template engine
 - **CommandLineParser** 2.9.1 — CLI argument parsing
+
+## Changelog / 变更日志工作流
+
+每次改造 luban 工程后，在用户验收通过、要求提交（commit）之前，**必须先更新 `CHANGELOG.md`**，并将该变更日志与代码改动一并提交（同一次 commit）。
+
+- 变更日志位于仓库根目录 `CHANGELOG.md`，主标题为 `## 变更日志`。
+- 在顶部（最新日期段上方）新增 `### YYYY-MM-DD` 段落，日期取当天；如已有当日段落则并入其中。
+- 每条改动以 **加粗标题** 概括，下接子条目说明动机、影响范围、是否向后兼容，并列出本次修改的关键文件。
+- 不要把 changelog 单独拆成一个 commit——必须与对应的代码改动放在同一次提交。
+- 纯文档/格式化/无行为变化的改动是否记录，由用户验收时决定。
