@@ -1,5 +1,14 @@
 ## 变更日志
 
+### 2026-06-24
+
+- **sep-bean 支持按多列(一列一字段)填写**
+  - 此前带 `sep` 属性的 bean（如 `<bean name="Gift" sep=",">`）无论 Excel 布局如何，始终按"整行折叠成一个单元格、再用 sep 切分"的方式读取。当实际把 bean 的字段拆到多列（一列一字段）填写时（例如多行列表 `multi_rows=1` 的元素 Gift 跨 4 列：类型/ID/数量/概率），只有第 1 列被读进首字段，其余字段静默取默认值（0）。
+  - 现在按"结构判据"判定：当 bean 标题跨多列（`ToIndex > FromIndex`，即用户配置了多列）时，按列位置逐字段读取，跳过 `bean.Sep` 折叠与 `TrySep`；否则保持原 sep 行为不变。同一 bean 类型在不同表里按不同布局填写会自动适配（如 `common.Gift` 在 InitGive 为单单元格 `"道具,4,1000"`，在 Drop.csv 为多列填写，两者均正确）。
+  - 向后兼容：单单元格、单单元格列表（ItemBox/Building/Item 等）、单字段 sep-bean 布局行为完全不变。单单元格列表走 `ExcelStreamDataCreator.ReadList` 路径，不经过 `StreamParser.ParseBean`，故不受影响。
+  - 判定发生在 `StreamParser.ParseBean`，通过 `ExcelStream` 新增的 `IgnoreBeanSep` 标志传递给 `ExcelStreamDataCreator.Accept(TBean)`。
+  - 修改文件：`Luban.DataLoader.Builtin/Excel/ExcelStream.cs`、`Luban.DataLoader.Builtin/Excel/DataParser/StreamParser.cs`、`Luban.DataLoader.Builtin/DataVisitors/ExcelStreamDataCreator.cs`。
+
 ### 2026-06-15
 
 - **元表 table 定义支持按 input 文件名推断 full_name / value_type**

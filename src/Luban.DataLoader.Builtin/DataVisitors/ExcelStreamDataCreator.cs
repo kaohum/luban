@@ -337,13 +337,16 @@ class ExcelStreamDataCreator : ITypeFuncVisitor<ExcelStream, DType>
     public DType Accept(TBean type, ExcelStream x)
     {
         var originBean = type.DefBean;
-        if (!string.IsNullOrEmpty(originBean.Sep))
+        if (!x.IgnoreBeanSep)
         {
-            x = new ExcelStream(x.ReadCell(), originBean.Sep);
-        }
-        else
-        {
-            x = TrySep(type, x);
+            if (!string.IsNullOrEmpty(originBean.Sep))
+            {
+                x = new ExcelStream(x.ReadCell(), originBean.Sep);
+            }
+            else
+            {
+                x = TrySep(type, x);
+            }
         }
 
         if (originBean.IsAbstractType)

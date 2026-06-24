@@ -59,6 +59,9 @@ public class StreamParser : DataParserBase
         {
             return null;
         }
+        // bean 配置成多列(一列一字段)时，按列位置读取，不再用 bean.Sep 折叠成单单元格。
+        // 单单元格列表(如 ItemBox/Building)走 ReadList，不经过此处，行为不受影响。
+        s.IgnoreBeanSep = title.SelfTitle.ToIndex > title.SelfTitle.FromIndex;
         return (DBean)type.Apply(ExcelStreamDataCreator.Ins, s);
     }
 

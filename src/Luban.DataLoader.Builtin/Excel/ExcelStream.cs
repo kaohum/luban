@@ -197,6 +197,10 @@ public class ExcelStream
 
     public int IncludeNullAndEmptySize => _toIndex - _curIndex + 1;
 
+    // 由 StreamParser.ParseBean 设置：bean 跨多列(一列一字段)填写时为 true。
+    // Accept(TBean) 据此跳过 bean.Sep 折叠与 TrySep，改为按列位置逐字段读取。
+    public bool IgnoreBeanSep { get; set; }
+
     public override string ToString()
     {
         var sb = new StringBuilder();
