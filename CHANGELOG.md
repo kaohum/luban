@@ -1,5 +1,15 @@
 ## 变更日志
 
+### 2026-08-10
+
+- **ChecksumInfo 增加 SignatureId（全字段结构 MD5，前后端一致）**
+  - 为增量导表计划（基准 + 增量双模式）提供结构版本判别符。新增 `StructureSignature.ComputeForTable(DefTable)` 静态方法，遍历表全名、mode、index + 行 bean 全字段（字段名/类型/可空/继承/children/enum 成员），输出大写 hex MD5。全字段遍历、不调 `NeedExport` -> client/server 不同 group 过滤下同值（与 `BinaryChecksumVisitor` 同原则）。
+  - `DefTable` 新增 `SignatureId` 属性；`GenerationContext.CalculateTableChecksums` 在算数据 checksum 的同时算 SignatureId（空表也算，空表有结构）。
+  - `ChecksumInfo` bean 增加第 3 字段 `SignatureId`（string），`checksumconfig` 每条记录变为 `{TableName, Checksum, SignatureId}`。一次性 baseline bump：C#/Java 生成代码需重生成（预期内）。
+  - 与 `GetTypeId` 无关且不碰它：`GetTypeId` 是名字 hash（多态判别），SignatureId 是结构版本（增量可用性）。`ITypeId`/`BeanBase`/`DefBean.Id`/`BinaryDataVisitor` 写 id 路径/全部语言模板完全不动。
+  - 向后兼容：仅新增字段和计算逻辑，现有导出流程行为不变（checksumconfig 多一列）。结构变化（加/删/改字段、改类型/可空、改枚举项、改继承、改 index/mode、改名）触发 SignatureId 变；只改数据值不触发。
+  - 修改文件：`src/Luban.Core/TypeVisitors/StructureSignature.cs`（新建）、`src/Luban.Core/Defs/DefTable.cs`、`src/Luban.Core/Checksum/ChecksumTableBuilder.cs`、`src/Luban.Core/GenerationContext.cs`。
+
 ### 2026-06-24
 
 - **sep-bean 支持按多列(一列一字段)填写**

@@ -70,6 +70,13 @@ public static class ChecksumTableBuilder
                     Type = "string",
                     Comment = "MD5校验和",
                     Groups = new List<string>()
+                },
+                new RawField
+                {
+                    Name = "SignatureId",
+                    Type = "string",
+                    Comment = "结构签名（MD5，全字段，前后端一致）",
+                    Groups = new List<string>()
                 }
             }
         };
@@ -122,8 +129,9 @@ public static class ChecksumTableBuilder
         var defBean = tbean.DefBean;
 
         // 获取字段类型
-        var tableNameField = defBean.HierarchyFields[0];  // TableName 字段
-        var checksumField = defBean.HierarchyFields[1];    // Checksum 字段
+        var tableNameField = defBean.HierarchyFields[0];    // TableName 字段
+        var checksumField = defBean.HierarchyFields[1];     // Checksum 字段
+        var signatureIdField = defBean.HierarchyFields[2];  // SignatureId 字段
 
         foreach (var table in tables)
         {
@@ -135,8 +143,9 @@ public static class ChecksumTableBuilder
             // 创建 DBean 数据
             var fields = new List<DType>
             {
-                DString.ValueOf(tableNameField.CType, table.Name),     // TableName
-                DString.ValueOf(checksumField.CType, table.Checksum)    // Checksum
+                DString.ValueOf(tableNameField.CType, table.Name),               // TableName
+                DString.ValueOf(checksumField.CType, table.Checksum),            // Checksum
+                DString.ValueOf(signatureIdField.CType, table.SignatureId ?? "")  // SignatureId
             };
 
             var dbean = new DBean(tbean, defBean, fields);

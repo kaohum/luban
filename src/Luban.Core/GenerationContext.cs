@@ -177,6 +177,7 @@ public class GenerationContext
             {
                 s_logger.Debug("table {TableName} has no records, checksum is empty", table.Name);
                 table.Checksum = "";
+                table.SignatureId = StructureSignature.ComputeForTable(table);
                 continue;
             }
 
@@ -195,6 +196,7 @@ public class GenerationContext
                 byte[] data = bytes.CopyData();
                 string checksum = Utils.FileUtil.CalcMD5(data);
                 table.Checksum = checksum;
+                table.SignatureId = StructureSignature.ComputeForTable(table);
 
                 s_logger.Debug("table {TableName} checksum: {Checksum} (records: {Count}, bytes: {Size})",
                     table.Name, checksum, records.Count, data.Length);

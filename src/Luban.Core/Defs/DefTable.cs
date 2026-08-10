@@ -112,6 +112,13 @@ public class DefTable : DefTypeBase
     /// </summary>
     public string Checksum { get; set; }
 
+    /// <summary>
+    /// 表的结构签名（大写 hex MD5）
+    /// 全字段、不调 NeedExport -> c/s 同值（与 BinaryChecksumVisitor 同原则）
+    /// 与 GetTypeId 无关（GetTypeId 是名字 hash、多态判别；本属性不碰它）
+    /// </summary>
+    public string SignatureId { get; set; } = "";
+
     public string OutputDataFile => string.IsNullOrWhiteSpace(_outputFile) ? FullName.Replace('.', '_').ToLower() : _outputFile;
 
     public override void Compile()
