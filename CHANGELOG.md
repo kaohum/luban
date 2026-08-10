@@ -1,5 +1,16 @@
 ## 变更日志
 
+### 2026-08-10
+
+- **增量导出共享基础设施（sidecar 模型/IO、PatchFormat、L10N helper 可见性）**
+  - 为后续增量导出器（baseline-with-sidecar / incremental / incremental-l10n-bin-split）提供共享的模型、IO、常量与 helper 可见性基础，本身不含导出器逻辑，可独立编译。
+  - 新增 `Luban.Core/Incremental/SidecarModels.cs`：全部共享 POCO 模型（`BaselineSidecar`/`TableSidecarEntry`/`L10NSidecar`/`LangSidecar`/`DeltaManifest`/`DeltaManifestEntry`），均带属性、无参构造、命名空间 `Luban.Incremental`。
+  - 新增 `Luban.Core/Incremental/BaselineSidecarIO.cs`：`BaselineSidecar`/`L10NSidecar` 的 JSON 读写（System.Text.Json，WriteIndented=true，Save 自动建目录），供基准导出器写、增量导出器读。
+  - 修改 `Luban.Core/BuiltinOptionNames.cs`：末尾加 4 个增量相关 option 名（`incremental` family、`incremental.sidecarPath`、`incremental.outputDir`、`incremental.l10nChecksumPath`）。
+  - 新增 `Luban.DataTarget.Builtin/Incremental/PatchFormat.cs`：DLP1/LLP1 magic 常量 + `WriteMagic(ByteBuf, string)` 写出辅助（命名空间 `Luban.DataExporter.Builtin.Incremental`）。
+  - 修改 `Luban.DataTarget.Builtin/L10NBinarySplitDataExporter.cs`：将 9 个 L10N 拆语言 helper 方法（`FindField`/`FindLanguageFields`/`IsValidKeyType`/`GetKeyValue`/`SerializeDictionaryToBinary`/`WriteKey`/`BuildLanguageFilePath`/`ExportL10NMergedPerLanguage`/`ExportL10NTablePerLanguage`）从 `private static` 改为 `internal static`，仅改可见性，逻辑不动，供下游 L10N 基准/增量导出器复用。
+  - 向后兼容：全部为新增文件或仅可见性放宽，不改既有行为。
+
 ### 2026-06-24
 
 - **sep-bean 支持按多列(一列一字段)填写**
