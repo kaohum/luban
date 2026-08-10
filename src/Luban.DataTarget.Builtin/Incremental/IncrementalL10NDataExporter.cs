@@ -153,51 +153,6 @@ public class IncrementalL10NDataExporter : DataExporterBase
     /// </summary>
     private static Dictionary<string, Dictionary<object, string>> BuildCurrent(GenerationContext ctx, IReadOnlyList<string> languages, string keyFieldName)
     {
-        var perLang = new Dictionary<string, Dictionary<object, string>>();
-        foreach (var lang in languages)
-        {
-            perLang[lang] = new Dictionary<object, string>();
-        }
-
-        foreach (var table in ctx.Tables)
-        {
-            if (table.ValueTType is not TBean tbean)
-            {
-                continue;
-            }
-            var bean = tbean.DefBean;
-            var keyField = L10NBinarySplitDataExporter.FindField(bean, keyFieldName);
-            if (keyField == null || !L10NBinarySplitDataExporter.IsValidKeyType(keyField.CType))
-            {
-                continue;
-            }
-            var langFields = L10NBinarySplitDataExporter.FindLanguageFields(bean, languages);
-            if (langFields.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var rec in ctx.GetTableExportDataList(table))
-            {
-                if (rec.Data is not DBean data)
-                {
-                    continue;
-                }
-                var key = L10NBinarySplitDataExporter.GetKeyValue(data.GetField(keyFieldName));
-                if (key == null)
-                {
-                    continue;
-                }
-                if (key is string ks && string.IsNullOrEmpty(ks))
-                {
-                    continue;
-                }
-                foreach (var lf in langFields)
-                {
-                    perLang[lf.Name][key] = (data.GetField(lf.Name) as DString)?.Value ?? "";
-                }
-            }
-        }
-        return perLang;
+        return L10NChecksumUtil.BuildPerLanguageMap(ctx, languages, keyFieldName);
     }
 }

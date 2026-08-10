@@ -337,6 +337,8 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         if (!string.IsNullOrWhiteSpace(mergeOutput))
         {
             ExportL10NMergedPerLanguage(ctx, tables, keyFieldName, languages, manifest, mergeOutput);
+            // 语言管线也导出 checksum 表（含 per-language 行），供前端/服务器按语言比对
+            ExportChecksumTable(ctx, dataTarget, tables, manifest);
             return;
         }
 
@@ -347,7 +349,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
             // 先尝试按语言拆分导出
             ExportL10NTablePerLanguage(table, records, keyFieldName, languages, manifest);
 
-            // 可选：是否保留原始“合并语言”的二进制文件
+            // 可选：是否保留原始"合并语言"的二进制文件
             if (keepMerged)
             {
                 var defaultFile = dataTarget.ExportTable(table, records);
@@ -356,6 +358,36 @@ public class L10NBinarySplitDataExporter : DataExporterBase
                     manifest.AddFile(defaultFile);
                 }
             }
+        }
+
+        // 语言管线也导出 checksum 表（含 per-language 行），供前端/服务器按语言比对
+        ExportChecksumTable(ctx, dataTarget, tables, manifest);
+    }
+
+    /// <summary>
+    /// 把 ChecksumConfig 表作为标准 bin 导出（checksumconfig.bytes）。
+    /// 语言管线里该表已由 GenerationContext 注入 per-language 行（TableName=语言名），
+    /// 前端/服务器用现有 ChecksumConfig 类按语言名读取。
+    /// </summary>
+    private static void ExportChecksumTable(GenerationContext ctx, IDataTarget dataTarget, IEnumerable<DefTable> tables, OutputFileManifest manifest)
+    {
+        foreach (var table in tables)
+        {
+            if (table.Name != Checksum.ChecksumTableBuilder.ChecksumTableName)
+            {
+                continue;
+            }
+            var records = ctx.GetTableExportDataList(table);
+            if (records == null || records.Count == 0)
+            {
+                continue;
+            }
+            var file = dataTarget.ExportTable(table, records);
+            if (file != null)
+            {
+                manifest.AddFile(file);
+            }
+            break;
         }
     }
 }

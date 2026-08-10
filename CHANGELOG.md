@@ -29,6 +29,17 @@
   - 导出脚本：`1基准配置导出.bat/.sh`（基准全量，客户端+服务器+多语言，写 sidecar）+ `2增量配置导出.bat/.sh`（增量，清空 delta 目录 + 客户端增量 + 服务器全量数据 + L10N 增量）。
   - 修改文件：`src/Luban.DataTarget.Builtin/Incremental/`（4 个新导出器 + PatchFormat）、`src/Luban.Core/Incremental/SidecarModels.cs`、`src/Luban.Core/Incremental/BaselineSidecarIO.cs`（SaveL10N）。
 
+- **L10N checksum 复用 ChecksumConfig 虚拟表（取代手写 _l10n.checksum.bytes）**
+  - 语言管线的 checksumconfig 注入 per-language 行：`TableName=语言名`、`Checksum=整语言文件 MD5`、`SignatureId=Language bean 结构签名（全语言共享）`。前端用**现有 ChecksumConfig 类**按语言名读取（`GetByTableName("zh_CN")`），服务器同样比对，零新生成代码/零新 loader。
+  - 新增 `Luban.Core/Incremental/L10NChecksumUtil.cs`：合并语言表 -> per-语言 (key->value) 映射、按语言序列化（与 l10n-bin-split 输出字节一致）、整语言文件 MD5。供 checksum 注入与 L10N 导出器共用（单一数据源）。
+  - `GenerationContext.AddL10NLanguageChecksumRecords`：L10NLanguages 非空时，在 per-table checksum 行后追加 14 行 per-language。
+  - `L10NBinarySplitDataExporter` 新增 `ExportChecksumTable`：语言管线也把 checksum 表导出为标准 bin（`checksumconfig.bytes`）。
+  - `ChecksumTableBuilder.CreateChecksumRecord`：抽出单记录构造（表行与语言行复用）。
+  - `L10NBaselineWithSidecarExporter` 移除 `_l10n.checksum.bytes` 产出；`IncrementalL10NDataExporter` 的 per-language 合并改用共享 util。
+  - 移除 `IncrementalL10NChecksumPath` 选项；基准/增量脚本移除 `incremental.l10nChecksumPath` 参数。
+  - 向后兼容：lang.conf 输出新增 `checksumconfig.bytes`（16 行：2 表 + 14 语言），`_l10n.checksum.bytes` 不再产出（无消费方，第二阶段运行时前端/服务器按新 checksumconfig 比对）。
+  - 修改文件：`src/Luban.Core/Incremental/L10NChecksumUtil.cs`（新建）、`src/Luban.Core/GenerationContext.cs`、`src/Luban.Core/Checksum/ChecksumTableBuilder.cs`、`src/Luban.Core/BuiltinOptionNames.cs`、`src/Luban.DataTarget.Builtin/L10NBinarySplitDataExporter.cs`、`src/Luban.DataTarget.Builtin/Incremental/L10NBaselineWithSidecarExporter.cs`、`src/Luban.DataTarget.Builtin/Incremental/IncrementalL10NDataExporter.cs`。
+
 ### 2026-06-24
 
 - **sep-bean 支持按多列(一列一字段)填写**

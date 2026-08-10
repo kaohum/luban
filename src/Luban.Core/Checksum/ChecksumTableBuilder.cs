@@ -125,13 +125,6 @@ public static class ChecksumTableBuilder
     public static List<Record> CreateChecksumRecords(DefTable checksumTable, IEnumerable<DefTable> tables)
     {
         var records = new List<Record>();
-        var tbean = checksumTable.ValueTType;
-        var defBean = tbean.DefBean;
-
-        // 获取字段类型
-        var tableNameField = defBean.HierarchyFields[0];    // TableName 字段
-        var checksumField = defBean.HierarchyFields[1];     // Checksum 字段
-        var signatureIdField = defBean.HierarchyFields[2];  // SignatureId 字段
 
         foreach (var table in tables)
         {
@@ -140,21 +133,37 @@ public static class ChecksumTableBuilder
                 continue;  // 跳过没有数据的表
             }
 
-            // 创建 DBean 数据
-            var fields = new List<DType>
-            {
-                DString.ValueOf(tableNameField.CType, table.Name),               // TableName
-                DString.ValueOf(checksumField.CType, table.Checksum),            // Checksum
-                DString.ValueOf(signatureIdField.CType, table.SignatureId ?? "")  // SignatureId
-            };
-
-            var dbean = new DBean(tbean, defBean, fields);
-
-            // 创建 Record
-            var record = new Record(dbean, "__checksum__", new List<string> { Record.DefaultTag });
-            records.Add(record);
+            records.Add(CreateChecksumRecord(checksumTable, table.Name, table.Checksum, table.SignatureId ?? ""));
         }
 
         return records;
+    }
+
+    /// <summary>
+    /// 创建单条 Checksum 记录（TableName / Checksum / SignatureId）。
+    /// 供普通表逐个创建，也供 L10N 管线按语言注入 per-language 行（TableName=语言名）。
+    /// </summary>
+    public static Record CreateChecksumRecord(DefTable checksumTable, string tableName, string checksum, string signatureId)
+    {
+        var tbean = checksumTable.ValueTType;
+        var defBean = tbean.DefBean;
+
+        // 获取字段类型
+        var tableNameField = defBean.HierarchyFields[0];    // TableName 字段
+        var checksumField = defBean.HierarchyFields[1];     // Checksum 字段
+        var signatureIdField = defBean.HierarchyFields[2];  // SignatureId 字段
+
+        // 创建 DBean 数据
+        var fields = new List<DType>
+        {
+            DString.ValueOf(tableNameField.CType, tableName),           // TableName
+            DString.ValueOf(checksumField.CType, checksum),             // Checksum
+            DString.ValueOf(signatureIdField.CType, signatureId ?? "")  // SignatureId
+        };
+
+        var dbean = new DBean(tbean, defBean, fields);
+
+        // 创建 Record
+        return new Record(dbean, "__checksum__", new List<string> { Record.DefaultTag });
     }
 }

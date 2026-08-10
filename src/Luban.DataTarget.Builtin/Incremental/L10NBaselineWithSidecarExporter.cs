@@ -67,54 +67,8 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
         var languages = ctx.L10NLanguages;
         var keyFieldName = ctx.L10NTextKeyFieldName;
 
-        // 合并所有语言表 -> perLang[lang] = key -> value（镜像 ExportL10NMergedPerLanguage 的合并语义）
-        var perLang = new Dictionary<string, Dictionary<object, string>>();
-        foreach (var lang in languages)
-        {
-            perLang[lang] = new Dictionary<object, string>();
-        }
-
-        DefField keyField = null;
-        foreach (var table in ctx.Tables)
-        {
-            if (table.ValueTType is not TBean tbean)
-            {
-                continue;
-            }
-            var bean = tbean.DefBean;
-            var kf = L10NBinarySplitDataExporter.FindField(bean, keyFieldName);
-            if (kf == null || !L10NBinarySplitDataExporter.IsValidKeyType(kf.CType))
-            {
-                continue;
-            }
-            var langFields = L10NBinarySplitDataExporter.FindLanguageFields(bean, languages);
-            if (langFields.Count == 0)
-            {
-                continue;
-            }
-            keyField ??= kf;
-
-            foreach (var rec in ctx.GetTableExportDataList(table))
-            {
-                if (rec.Data is not DBean data)
-                {
-                    continue;
-                }
-                var key = L10NBinarySplitDataExporter.GetKeyValue(data.GetField(keyFieldName));
-                if (key == null)
-                {
-                    continue;
-                }
-                if (key is string ks && string.IsNullOrEmpty(ks))
-                {
-                    continue;
-                }
-                foreach (var lf in langFields)
-                {
-                    perLang[lf.Name][key] = (data.GetField(lf.Name) as DString)?.Value ?? "";
-                }
-            }
-        }
+        // 合并所有语言表 -> perLang[lang] = key -> value（共享 util，与 checksum 注入一致）
+        var perLang = L10NChecksumUtil.BuildPerLanguageMap(ctx, languages, keyFieldName);
 
         // SignatureId：任取一张 L10N 表的行 bean 结构（全语言共享）
         string sigId = "";
@@ -139,7 +93,6 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
         var keys = keySet.ToList();
 
         var sidecar = new L10NSidecar { SignatureId = sigId, Keys = keys };
-        var langMd5 = new Dictionary<string, string>();
         foreach (var (lang, map) in perLang)
         {
             // key-string -> value，便于按下标对齐
@@ -156,36 +109,7 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
                 hashes.Add(FileUtil.CalcMD5(System.Text.Encoding.UTF8.GetBytes(v)));
             }
             sidecar.Languages[lang] = new LangSidecar { Hashes = hashes };
-
-            // 整语言文件 MD5（镜像 SerializeDictionaryToBinary 布局）
-            var buf = new ByteBuf();
-            buf.WriteSize(map.Count);
-            foreach (var kv in map)
-            {
-                if (keyField != null)
-                {
-                    L10NBinarySplitDataExporter.WriteKey(buf, kv.Key, keyField.CType);
-                }
-                buf.WriteString(kv.Value ?? "");
-            }
-            langMd5[lang] = FileUtil.CalcMD5(buf.CopyData());
         }
         BaselineSidecarIO.SaveL10N(path, sidecar);
-
-        // _l10n.checksum.bytes（加进 manifest，随输出保存，FileCleaner 才不删）。
-        // 相对 bin.outputDataDir 的默认名 _l10n.checksum.bytes，可用 -x incremental.l10nChecksumPath 覆盖相对名。
-        var csName = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalL10NChecksumPath, true, "_l10n.checksum.bytes");
-        if (!string.IsNullOrEmpty(csName))
-        {
-            var cs = new ByteBuf();
-            cs.WriteString(sigId);
-            cs.WriteSize(langMd5.Count);
-            foreach (var kv in langMd5)
-            {
-                cs.WriteString(kv.Key);
-                cs.WriteString(kv.Value);
-            }
-            manifest.AddFile(new OutputFile { File = csName, Content = cs.CopyData() });
-        }
     }
 }

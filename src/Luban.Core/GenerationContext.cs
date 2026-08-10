@@ -268,6 +268,13 @@ public class GenerationContext
             // 创建 Checksum 数据记录
             var checksumRecords = Checksum.ChecksumTableBuilder.CreateChecksumRecords(checksumTable, Tables);
 
+            // L10N 管线：追加 per-language 行（TableName=语言名，Checksum=整语言文件 MD5，SignatureId 共享）
+            // 前端/服务器用现有 ChecksumConfig 类按语言名读取，做登录时 per-语言精准比对。
+            if (L10NLanguages.Count > 0)
+            {
+                AddL10NLanguageChecksumRecords(checksumTable, checksumRecords);
+            }
+
             if (checksumRecords.Count == 0)
             {
                 s_logger.Warn("no checksum records to export");
@@ -282,6 +289,31 @@ public class GenerationContext
         catch (Exception ex)
         {
             s_logger.Error(ex, "failed to create checksum table data");
+        }
+    }
+
+    /// <summary>
+    /// L10N 管线：把每种语言的整语言文件 MD5 作为 ChecksumConfig 的一行注入
+    /// （TableName=语言名，Checksum=整语言文件 MD5，SignatureId 共享）。
+    /// 前端/服务器用现有 ChecksumConfig 类按语言名读取，做登录时 per-语言精准比对。
+    /// </summary>
+    private void AddL10NLanguageChecksumRecords(DefTable checksumTable, List<Record> checksumRecords)
+    {
+        // 共享 SignatureId：任取一张 L10N 表（全语言共享 Language bean 结构签名）
+        string sharedSig = "";
+        foreach (var t in Tables)
+        {
+            if (t.ValueTType is Types.TBean)
+            {
+                sharedSig = TypeVisitors.StructureSignature.ComputeForTable(t);
+                break;
+            }
+        }
+
+        var langMd5s = Incremental.L10NChecksumUtil.ComputePerLanguageFileMd5(this, L10NLanguages, L10NTextKeyFieldName);
+        foreach (var (lang, md5) in langMd5s)
+        {
+            checksumRecords.Add(Checksum.ChecksumTableBuilder.CreateChecksumRecord(checksumTable, lang, md5, sharedSig));
         }
     }
 
