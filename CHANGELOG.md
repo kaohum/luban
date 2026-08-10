@@ -19,6 +19,16 @@
   - 修改 `Luban.DataTarget.Builtin/L10NBinarySplitDataExporter.cs`：将 9 个 L10N 拆语言 helper 方法（`FindField`/`FindLanguageFields`/`IsValidKeyType`/`GetKeyValue`/`SerializeDictionaryToBinary`/`WriteKey`/`BuildLanguageFilePath`/`ExportL10NMergedPerLanguage`/`ExportL10NTablePerLanguage`）从 `private static` 改为 `internal static`，仅改可见性，逻辑不动，供下游 L10N 基准/增量导出器复用。
   - 向后兼容：全部为新增文件或仅可见性放宽，不改既有行为。
 
+- **增量导出器（普通表 + L10N）与导出脚本接线**
+  - 新增 `[DataExporter("baseline-with-sidecar")]`（`BaselineWithSidecarExporter`）：包装 `tag-split`，正常产 `.bytes` 之外，用 `BinaryDataVisitor` 行字节算 per-row MD5（按目标 group 过滤字段），写 `_baseline.{target}.sidecar.json`（工具内部、不 ship，供增量 diff）。
+  - 新增 `[DataExporter("incremental")]`（`IncrementalDataExporter`）：读基准 sidecar → 结构 gate（`SignatureId` 全表扫，任何不一致**整批中止**并一次列出全部 offender、不产出任何文件）→ 行级 diff（按主索引首字段）→ 出 DLP1 patch（magic + signatureId + upsert 行字节 + delete 主键）+ `_delta.manifest`。行字节与全表 `.bytes` 一致，客户端复用现有反序列化。
+  - 新增 `[DataExporter("l10n-baseline-with-sidecar")]`（`L10NBaselineWithSidecarExporter`）：包装 `l10n-bin-split`，写 L10N sidecar（**共享 Keys 记一次 + 各语言 Hashes 按下标对齐**，避免每语言重复 key 字典）+ `_l10n.checksum.bytes`（signatureId + per-lang 整文件 MD5，加进 manifest 保存）。
+  - 新增 `[DataExporter("incremental-l10n-bin-split")]`（`IncrementalL10NDataExporter`）：读 L10N sidecar → 结构 gate（Language bean SignatureId）→ per-语言 key->value 行级 diff → 出 LLP1 patch + `_l10n.delta.manifest`。
+  - 行键规则：`IndexFieldIdIndex`（主索引首字段，与客户端 `dataMap` key 一致）；联合索引首字段不唯一/无主键的表（如 `Action+Target`）无稳定行键，增量导出**跳过该类表**（进基准全量）。ONE 表单记录兜底。
+  - delta 语义：永远是"基准->当前"累计 diff，增量目录每次**整体清空再写**（绝不 append）。
+  - 导出脚本：`1基准配置导出.bat/.sh`（基准全量，客户端+服务器+多语言，写 sidecar）+ `2增量配置导出.bat/.sh`（增量，清空 delta 目录 + 客户端增量 + 服务器全量数据 + L10N 增量）。
+  - 修改文件：`src/Luban.DataTarget.Builtin/Incremental/`（4 个新导出器 + PatchFormat）、`src/Luban.Core/Incremental/SidecarModels.cs`、`src/Luban.Core/Incremental/BaselineSidecarIO.cs`（SaveL10N）。
+
 ### 2026-06-24
 
 - **sep-bean 支持按多列(一列一字段)填写**

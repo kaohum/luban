@@ -52,21 +52,27 @@ public class TableSidecarEntry
 
 /// <summary>
 /// L10N 基准 sidecar，全语言共享一个 SignatureId（Language bean 结构签名）。
-/// per-语言记录 key -> MD5(value)。
+/// 所有语言共享同一份 key 集合（key×语言矩阵，缺失语言列写空串），
+/// 因此 Keys 只记一次，各语言 LangSidecar.Hashes 按下标与 Keys 对齐。
 /// </summary>
 public class L10NSidecar
 {
     public string SignatureId { get; set; } = "";
 
+    /// <summary>
+    /// 共享 key 集合（所有语言一致，排序保证确定性）。
+    /// </summary>
+    public List<string> Keys { get; set; } = new();
+
     public Dictionary<string, LangSidecar> Languages { get; set; } = new();
 }
 
 /// <summary>
-/// 单种语言在 L10N sidecar 中的条目。
+/// 单种语言在 L10N sidecar 中的条目：与 L10NSidecar.Keys 下标对齐的 MD5(value) 列表。
 /// </summary>
 public class LangSidecar
 {
-    public Dictionary<string, string> RowHashes { get; set; } = new();
+    public List<string> Hashes { get; set; } = new();
 }
 
 /// <summary>

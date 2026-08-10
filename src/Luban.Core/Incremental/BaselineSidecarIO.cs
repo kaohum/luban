@@ -54,6 +54,19 @@ public static class BaselineSidecarIO
     }
 
     /// <summary>
+    /// 保存 L10N 基准 sidecar（WriteIndented=true，自动建目录）。
+    /// </summary>
+    public static void SaveL10N(string path, L10NSidecar sidecar)
+    {
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+        File.WriteAllText(path, JsonSerializer.Serialize(sidecar, s_opt));
+    }
+
+    /// <summary>
     /// 加载 L10N 基准 sidecar。
     /// </summary>
     public static L10NSidecar LoadL10N(string path)
