@@ -64,12 +64,12 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         return dataTarget is DataExporter.Builtin.Binary.BinaryDataTarget;
     }
 
-    private static DefField FindField(DefBean bean, string fieldName)
+    internal static DefField FindField(DefBean bean, string fieldName)
     {
         return bean.Fields.FirstOrDefault(f => string.Equals(f.Name, fieldName, StringComparison.Ordinal));
     }
 
-    private static List<DefField> FindLanguageFields(DefBean bean, IReadOnlyList<string> languages)
+    internal static List<DefField> FindLanguageFields(DefBean bean, IReadOnlyList<string> languages)
     {
         var result = new List<DefField>();
         foreach (var lang in languages)
@@ -84,24 +84,24 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         return result;
     }
 
-    private static string BuildLanguageFilePath(string lang, DefTable table)
+    internal static string BuildLanguageFilePath(string lang, DefTable table)
     {
         // 目录：{lang}/{TableOutputName}.bytes
         string fileName = $"{table.OutputDataFile}.bytes";
         return Path.Combine(lang, fileName);
     }
 
-    private static bool IsValidKeyType(TType type)
+    internal static bool IsValidKeyType(TType type)
     {
         return type is TString || type is TInt || type is TLong || type is TShort || type is TByte;
     }
 
-    private static object GetKeyValue(DType data)
+    internal static object GetKeyValue(DType data)
     {
         return data.GetValueObject();
     }
 
-    private static void WriteKey(ByteBuf buf, object key, TType type)
+    internal static void WriteKey(ByteBuf buf, object key, TType type)
     {
         switch (type)
         {
@@ -114,7 +114,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         }
     }
 
-    private static byte[] SerializeDictionaryToBinary(Dictionary<object, string> dict, TType keyType)
+    internal static byte[] SerializeDictionaryToBinary(Dictionary<object, string> dict, TType keyType)
     {
         var buf = new ByteBuf();
         buf.WriteSize(dict.Count);
@@ -126,7 +126,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         return buf.CopyData();
     }
 
-    private static void ExportL10NTablePerLanguage(DefTable table, List<Record> records,
+    internal static void ExportL10NTablePerLanguage(DefTable table, List<Record> records,
         string keyFieldName, IReadOnlyList<string> languages, OutputFileManifest manifest)
     {
         if (table.ValueTType is not TBean tbean)
@@ -203,7 +203,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
     /// 把多张多语言表的记录按语言合并进同一个二进制文件：{lang}/{outputFileName}.bytes。
     /// 典型场景：LanguageCode 表（代码引用 key）与 LanguageText 表（策划文本 key）合并导出一个运行时 bin。
     /// </summary>
-    private static void ExportL10NMergedPerLanguage(GenerationContext ctx, IReadOnlyList<DefTable> tables,
+    internal static void ExportL10NMergedPerLanguage(GenerationContext ctx, IReadOnlyList<DefTable> tables,
         string keyFieldName, IReadOnlyList<string> languages, OutputFileManifest manifest, string outputFileName)
     {
         // 仅保留 value 为 bean、含合法 key 字段、且至少有一个语言字段的表

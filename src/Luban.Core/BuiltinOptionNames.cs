@@ -78,4 +78,12 @@ public static class BuiltinOptionNames
     public const string FileEncoding = "fileEncoding";
 
     public const string CsvSourceOutputDir = "csvSourceOutputDir";
+
+    public const string IncrementalFamily = "incremental";
+
+    public const string IncrementalSidecarPath = "incremental.sidecarPath";
+
+    public const string IncrementalOutputDir = "incremental.outputDir";
+
+    public const string IncrementalL10NChecksumPath = "incremental.l10nChecksumPath";
 }
