@@ -47,6 +47,16 @@ public class TableSidecarEntry
 
     public int RowCount { get; set; }
 
+    /// <summary>
+    /// 全量数据内容指纹（MD5，不过 group 过滤）。供下次基准导出做 Stamp gating（内容没变则戳沿用）。
+    /// </summary>
+    public string ContentHash { get; set; } = "";
+
+    /// <summary>
+    /// 内容版本戳（unix 秒）。checksumconfig 对外下发同值；下次基准内容没变则沿用。
+    /// </summary>
+    public long Stamp { get; set; }
+
     public Dictionary<string, string> RowHashes { get; set; } = new();
 }
 
@@ -65,14 +75,27 @@ public class L10NSidecar
     public List<string> Keys { get; set; } = new();
 
     public Dictionary<string, LangSidecar> Languages { get; set; } = new();
+
+    /// <summary>
+    /// L10N 管线里的语言表（LanguageCode/LanguageText 等）的 (ContentHash, Stamp)，供下次基准做表级戳 gating。
+    /// 复用 TableSidecarEntry（仅用 ContentHash+Stamp，其余字段空）。
+    /// </summary>
+    public Dictionary<string, TableSidecarEntry> Tables { get; set; } = new();
 }
 
 /// <summary>
-/// 单种语言在 L10N sidecar 中的条目：与 L10NSidecar.Keys 下标对齐的 MD5(value) 列表。
+/// 单种语言在 L10N sidecar 中的条目：与 L10NSidecar.Keys 下标对齐的 MD5(value) 列表，
+/// 外加该语言的整语言内容指纹（gating）与版本戳。
 /// </summary>
 public class LangSidecar
 {
     public List<string> Hashes { get; set; } = new();
+
+    /// <summary>该语言整语言文件的内容指纹（MD5），供下次基准 Stamp gating。</summary>
+    public string ContentHash { get; set; } = "";
+
+    /// <summary>该语言内容版本戳（unix 秒），checksumconfig per-language 行下发同值。</summary>
+    public long Stamp { get; set; }
 }
 
 /// <summary>
@@ -100,4 +123,9 @@ public class DeltaManifestEntry
     public int DeleteCount { get; set; }
 
     public string PatchFile { get; set; } = "";
+
+    /// <summary>
+    /// 该表/语言应用本 patch 后应更新到的版本戳（unix 秒）。客户端 apply 后据此更新本地戳，下次登录上报新值。
+    /// </summary>
+    public long Stamp { get; set; }
 }

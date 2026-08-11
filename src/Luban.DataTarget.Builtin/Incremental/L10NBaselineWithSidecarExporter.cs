@@ -20,6 +20,7 @@
 
 using System;
 using System.Collections.Generic;
+using Luban.Checksum;
 using Luban.DataTarget;
 using Luban.Datas;
 using Luban.Defs;
@@ -93,6 +94,8 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
         var keys = keySet.ToList();
 
         var sidecar = new L10NSidecar { SignatureId = sigId, Keys = keys };
+        // per-language (ContentHash, Stamp)：内容相关戳，与 checksumconfig 注入共用同一份计算（ctx 缓存）
+        var langStamps = ctx.GetL10NLangStamps();
         foreach (var (lang, map) in perLang)
         {
             // key-string -> value，便于按下标对齐
@@ -108,7 +111,32 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
                 var v = mapStr.TryGetValue(k, out var val) ? val : "";
                 hashes.Add(FileUtil.CalcMD5(System.Text.Encoding.UTF8.GetBytes(v)));
             }
-            sidecar.Languages[lang] = new LangSidecar { Hashes = hashes };
+            var stampInfo = langStamps.GetValueOrDefault(lang);
+            sidecar.Languages[lang] = new LangSidecar
+            {
+                Hashes = hashes,
+                ContentHash = stampInfo.ContentHash,
+                Stamp = stampInfo.Stamp,
+            };
+        }
+
+        // L10N 管线里的语言表（LanguageCode/LanguageText 等）也记 (ContentHash, Stamp)，供下次基准表级戳 gating
+        foreach (var table in ctx.Tables)
+        {
+            if (table.Name == Checksum.ChecksumTableBuilder.ChecksumTableName)
+            {
+                continue;
+            }
+            if (string.IsNullOrEmpty(table.ContentHash))
+            {
+                continue;
+            }
+            sidecar.Tables[table.FullName] = new TableSidecarEntry
+            {
+                SignatureId = table.SignatureId,
+                ContentHash = table.ContentHash,
+                Stamp = table.Stamp,
+            };
         }
         BaselineSidecarIO.SaveL10N(path, sidecar);
     }

@@ -152,6 +152,7 @@ public class IncrementalDataExporter : DataExporterBase
                 UpsertCount = upserts.Count,
                 DeleteCount = deletes.Count,
                 PatchFile = file.File,
+                Stamp = table.Stamp,
             });
         }
 

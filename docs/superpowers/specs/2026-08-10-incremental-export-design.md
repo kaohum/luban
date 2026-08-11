@@ -5,6 +5,8 @@
 - 作者：陈昊然 / Claude
 - 关联工程：Luban 源码 `E:\Projects\luban`；配置工程 `D:\work\slg2\common\config`；客户端 `D:\work\slg2\client\game`
 
+> ⚠️ **2026-08-11 修订（以本文下方为准的部分已过时）**：checksumconfig 的版本值已从 **MD5** 改为**内容相关的时间戳 `Stamp`（long，unix 秒，可比大小）**；基准参照文件改名 `baseline/tables.json` / `baseline/l10n.json`（原 `_sidecar/...`）；sidecar 模型加 `ContentHash`+`Stamp`，manifest 加 `Stamp`。当前权威实现见 `CHANGELOG.md`（2026-08-11 段）与 `D:\work\slg2\docs\slg\config-increment-20260810\二期运行时实现交接.md`。本文的 SignatureId 算法、delta（DLP1/LLP1）、行键、结构 gate 等仍有效；凡涉及 `Checksum`(MD5) 字段、`_sidecar/` 路径、`_l10n.checksum.bytes` 的描述，按上述修订替换。
+
 ---
 
 ## 1. 背景与名词

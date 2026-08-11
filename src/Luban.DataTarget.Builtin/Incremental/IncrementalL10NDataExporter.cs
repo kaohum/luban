@@ -74,6 +74,7 @@ public class IncrementalL10NDataExporter : DataExporterBase
         var perLang = BuildCurrent(ctx, languages, keyFieldName);
 
         var changed = new List<DeltaManifestEntry>();
+        var langStamps = ctx.GetL10NLangStamps();
         foreach (var lang in languages)
         {
             var cur = perLang.GetValueOrDefault(lang) ?? new Dictionary<object, string>();
@@ -136,7 +137,14 @@ public class IncrementalL10NDataExporter : DataExporterBase
 
             var patchFile = $"{lang}/{mergeOutput}.patch.bytes";
             manifest.AddFile(new OutputFile { File = patchFile, Content = buf.CopyData() });
-            changed.Add(new DeltaManifestEntry { Table = lang, UpsertCount = upserts.Count, DeleteCount = deletes.Count, PatchFile = patchFile });
+            changed.Add(new DeltaManifestEntry
+            {
+                Table = lang,
+                UpsertCount = upserts.Count,
+                DeleteCount = deletes.Count,
+                PatchFile = patchFile,
+                Stamp = langStamps.GetValueOrDefault(lang).Stamp,
+            });
         }
 
         // _l10n.delta.manifest

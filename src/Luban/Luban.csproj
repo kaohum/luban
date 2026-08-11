@@ -89,7 +89,9 @@
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-      <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.dll D:\work\slg\common\config\Tools\Luban" />
+      <!-- 部署 Luban.dll 到各配置工程的 Tools/Luban（仅 DLL，不含 Templates/，避免覆盖自定义模板） -->
+      <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.dll D:\work\slg\common\config\Tools\Luban" Condition="Exists('D:\work\slg\common\config\Tools\Luban')" />
+      <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.dll D:\work\slg2\common\config\Tools\Luban" Condition="Exists('D:\work\slg2\common\config\Tools\Luban')" />
     </Target>
 
 </Project>

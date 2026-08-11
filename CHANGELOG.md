@@ -1,5 +1,20 @@
 ## 变更日志
 
+### 2026-08-11
+
+- **checksumconfig 版本值从 MD5 改为内容相关的时间戳 Stamp（long，unix 秒，可比大小）**
+  - 原 `ChecksumInfo.Checksum`（string，全量数据 MD5）语义改为 **内容版本戳**：字段改名 `Stamp`、类型 `long`（unix 秒）。服务器比对由"MD5 等值"改为"戳比大小"：客户端戳 == 服务器戳 -> 最新不下发；< -> 落下发 patch；> -> 客户端领先（回滚）下发全量。SignatureId（结构）仍走等值，不变。
+  - **戳内容相关**：基准导出读上次的 `baseline/tables.json`（普通表）/ `baseline/l10n.json`（L10N），逐表/逐语言比内容指纹（内部仍算全量数据 MD5 作为 `ContentHash`，不对外下发）；没变 -> 沿用上次戳；变了 -> 推进到本次批次时间。首次基准或内容变 -> 批次时间。
+  - **批次时间**：新增 `incremental.exportStamp` 选项。脚本发布开始 `date +%s` 算一次，传给同次发布的 client/server/lang 三次基准调用，保证"内容变了"的表三方写出同一个新戳（没变的表靠 gating 沿用）。未配置时回退当前 unix 秒（仅单次调用自洽）。
+  - 基准 sidecar（`TableSidecarEntry`/`LangSidecar`）加 `ContentHash` + `Stamp` 字段；`DeltaManifestEntry` 加 `Stamp`（客户端 apply patch 后据此更新本地戳，下次登录上报新值）。L10N sidecar（`L10NSidecar`）加 `Tables` 段，存 LanguageCode/LanguageText 等语言表的 `(ContentHash, Stamp)`，让 L10N 管线里这些表行也走戳 gating（修掉"二次基准 language/checksumconfig.bytes 变化"）。
+  - 一次性 baseline bump：`ChecksumInfo` 生成代码字段从 `Checksum:string` 变 `Stamp:long`（C#/Java 等需重生成，预期内）。binary 编码：`[n][WriteString TableName][WriteLong Stamp][WriteString SignatureId]`。
+  - 修改文件：`src/Luban.Core/Checksum/ChecksumTableBuilder.cs`、`src/Luban.Core/Defs/DefTable.cs`（`Checksum`->`ContentHash` 内部指纹 + 新增 `Stamp`）、`src/Luban.Core/GenerationContext.cs`（戳 gating、`GetExportStamp`、`GetL10NLangStamps`）、`src/Luban.Core/Incremental/SidecarModels.cs`、`src/Luban.DataTarget.Builtin/Incremental/{BaselineWithSidecarExporter,L10NBaselineWithSidecarExporter,IncrementalDataExporter,IncrementalL10NDataExporter}.cs`、`src/Luban.Core/BuiltinOptionNames.cs`。
+
+- **基准参照文件改名 + 增量不产 checksumconfig**
+  - sidecar 改名（去 "sidecar" 黑话、去冗余）：`_sidecar/_baseline.client.sidecar.json` -> `baseline/tables.json`；`_sidecar/language/_baseline.l10n.sidecar.json` -> `baseline/l10n.json`。目录不带下划线，工具内部产物不 ship。
+  - 增量导出（`incremental` / `incremental-l10n-bin-split`）确认**不产 checksumconfig**：checksumconfig 只由基准导出产生；增量只产 patch + manifest。普通表 + L10N 两条增量管线均如此。
+  - `src/Luban/Luban.csproj` 的 PostBuild 部署目标补 `D:\work\slg2`（Condition Exists，仅复制 `Luban.dll`，不含 Templates/）。
+
 ### 2026-08-10
 
 - **ChecksumInfo 增加 SignatureId（全字段结构 MD5，前后端一致）**

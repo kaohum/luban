@@ -84,6 +84,8 @@ public class BaselineWithSidecarExporter : TagSplitDataExporter
                 Mode = table.Mode.ToString(),
                 PrimaryKeyIndex = table.Index ?? "",
                 RowCount = records.Count,
+                ContentHash = table.ContentHash,
+                Stamp = table.Stamp,
                 RowHashes = new Dictionary<string, string>(records.Count),
             };
             foreach (var rec in records)

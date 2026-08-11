@@ -66,9 +66,9 @@ public static class ChecksumTableBuilder
                 },
                 new RawField
                 {
-                    Name = "Checksum",
-                    Type = "string",
-                    Comment = "MD5校验和",
+                    Name = "Stamp",
+                    Type = "long",
+                    Comment = "内容版本戳（unix 秒，内容相关：内容没变则沿用）",
                     Groups = new List<string>()
                 },
                 new RawField
@@ -128,36 +128,35 @@ public static class ChecksumTableBuilder
 
         foreach (var table in tables)
         {
-            if (string.IsNullOrEmpty(table.Checksum))
+            if (string.IsNullOrEmpty(table.ContentHash))
             {
                 continue;  // 跳过没有数据的表
             }
 
-            records.Add(CreateChecksumRecord(checksumTable, table.Name, table.Checksum, table.SignatureId ?? ""));
+            records.Add(CreateChecksumRecord(checksumTable, table.Name, table.Stamp, table.SignatureId ?? ""));
         }
 
         return records;
     }
 
     /// <summary>
-    /// 创建单条 Checksum 记录（TableName / Checksum / SignatureId）。
+    /// 创建单条 Checksum 记录（TableName / Stamp / SignatureId）。
     /// 供普通表逐个创建，也供 L10N 管线按语言注入 per-language 行（TableName=语言名）。
     /// </summary>
-    public static Record CreateChecksumRecord(DefTable checksumTable, string tableName, string checksum, string signatureId)
+    public static Record CreateChecksumRecord(DefTable checksumTable, string tableName, long stamp, string signatureId)
     {
         var tbean = checksumTable.ValueTType;
         var defBean = tbean.DefBean;
 
         // 获取字段类型
         var tableNameField = defBean.HierarchyFields[0];    // TableName 字段
-        var checksumField = defBean.HierarchyFields[1];     // Checksum 字段
-        var signatureIdField = defBean.HierarchyFields[2];  // SignatureId 字段
+        var signatureIdField = defBean.HierarchyFields[2];  // SignatureId 字段（[1] 是 Stamp，long 无需 type）
 
         // 创建 DBean 数据
         var fields = new List<DType>
         {
             DString.ValueOf(tableNameField.CType, tableName),           // TableName
-            DString.ValueOf(checksumField.CType, checksum),             // Checksum
+            DLong.ValueOf(stamp),                                       // Stamp
             DString.ValueOf(signatureIdField.CType, signatureId ?? "")  // SignatureId
         };
 

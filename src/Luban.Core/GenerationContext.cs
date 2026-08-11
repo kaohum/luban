@@ -22,6 +22,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Luban.CodeFormat;
@@ -84,6 +85,9 @@ public class GenerationContext
     private readonly object _loadDatasLock = new();
 
     private List<L10NKeyInfo> _l10nKeyInfos;
+
+    // per-language (ContentHash, Stamp) 缓存，供 checksumconfig 注入与 l10n sidecar 写入共用（GetL10NLangStamps）
+    private Dictionary<string, (string ContentHash, long Stamp)> _l10nLangStamps;
 
     // dataExporter 名称（例如 default、l10n-bin-split），供模板感知当前导出模式
     public string DataExporterName { get; private set; }
@@ -150,6 +154,7 @@ public class GenerationContext
 
             s_logger.Info("load datas begin");
             _l10nKeyInfos = null;
+            _l10nLangStamps = null;
             TextProvider?.Load();
             DataLoaderManager.Ins.LoadDatas(this);
 
@@ -162,28 +167,35 @@ public class GenerationContext
     }
 
     /// <summary>
-    /// 为所有表计算校验和（MD5）
-    /// 基于全量数据计算，确保前后端使用相同源数据时获得相同的校验和
+    /// 为所有表计算内容指纹（全量数据 MD5，不过 group 过滤 -> c/s 同值）+ 内容版本戳 Stamp。
+    /// Stamp 内容相关：读上次基准 sidecar，该表内容指纹没变 -> 沿用上次戳；变了 -> 本次批次时间。
+    /// 仅普通表管线在此 gate（L10N 管线的 per-language 戳在 AddL10NLanguageChecksumRecords 算）。
     /// </summary>
     private void CalculateTableChecksums()
     {
         s_logger.Info("calculate table checksums begin");
 
+        var batchTime = GetExportStamp();
+        // 读上次基准里每张表的 (ContentHash, Stamp) 用于戳 gating：普通管线从 tables.json，L10N 管线从 l10n.json.Tables。
+        var prevTables = LoadPreviousTableStamps();
+
         foreach (var table in Tables)
         {
+            table.SignatureId = StructureSignature.ComputeForTable(table);
+
             if (!_recordsByTables.TryGetValue(table.FullName, out var tableDataInfo) ||
                 tableDataInfo.FinalRecords == null ||
                 tableDataInfo.FinalRecords.Count == 0)
             {
-                s_logger.Debug("table {TableName} has no records, checksum is empty", table.Name);
-                table.Checksum = "";
-                table.SignatureId = StructureSignature.ComputeForTable(table);
+                s_logger.Debug("table {TableName} has no records, content hash empty", table.Name);
+                table.ContentHash = "";
+                table.Stamp = 0;
                 continue;
             }
 
             try
             {
-                // 使用二进制序列化计算 MD5
+                // 使用二进制序列化计算内容指纹（全量数据 MD5）
                 var bytes = new Serialization.ByteBuf();
                 var records = tableDataInfo.FinalRecords;
 
@@ -193,18 +205,18 @@ public class GenerationContext
                     record.Data.Apply(new DataVisitors.BinaryChecksumVisitor(), bytes);
                 }
 
-                byte[] data = bytes.CopyData();
-                string checksum = Utils.FileUtil.CalcMD5(data);
-                table.Checksum = checksum;
-                table.SignatureId = StructureSignature.ComputeForTable(table);
+                string contentHash = Utils.FileUtil.CalcMD5(bytes.CopyData());
+                table.ContentHash = contentHash;
+                table.Stamp = ResolveTableStamp(prevTables, table.FullName, contentHash, batchTime);
 
-                s_logger.Debug("table {TableName} checksum: {Checksum} (records: {Count}, bytes: {Size})",
-                    table.Name, checksum, records.Count, data.Length);
+                s_logger.Debug("table {TableName} contentHash: {ContentHash} stamp: {Stamp} (records: {Count})",
+                    table.Name, contentHash, table.Stamp, records.Count);
             }
             catch (Exception ex)
             {
                 s_logger.Error(ex, "failed to calculate checksum for table {TableName}", table.Name);
-                table.Checksum = "";
+                table.ContentHash = "";
+                table.Stamp = batchTime;
             }
         }
 
@@ -212,6 +224,64 @@ public class GenerationContext
         CreateChecksumData();
 
         s_logger.Info("calculate table checksums end");
+    }
+
+    /// <summary>
+    /// 解析一张表的版本戳：上次基准里该表内容指纹没变（且上次戳有效 >0）-> 沿用上次戳；否则 -> 批次时间。
+    /// 首次基准 / 内容变了 / 上次无戳 -> 推进到 batchTime。
+    /// </summary>
+    private static long ResolveTableStamp(Dictionary<string, (string ContentHash, long Stamp)> prevTables, string tableFullName, string contentHash, long batchTime)
+    {
+        if (prevTables != null &&
+            prevTables.TryGetValue(tableFullName, out var prev) &&
+            !string.IsNullOrEmpty(prev.ContentHash) && prev.ContentHash == contentHash &&
+            prev.Stamp > 0)
+        {
+            return prev.Stamp;
+        }
+        return batchTime;
+    }
+
+    /// <summary>
+    /// 读上次基准的 per-table (ContentHash, Stamp)。普通管线读 baseline/tables.json；L10N 管线读 baseline/l10n.json 的 Tables 段。
+    /// 不存在/读失败 -> null（首次基准或 gate 失效，全部推进到 batchTime）。
+    /// </summary>
+    private Dictionary<string, (string ContentHash, long Stamp)> LoadPreviousTableStamps()
+    {
+        var path = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalSidecarPath, true, "");
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return null;
+        }
+        try
+        {
+            if (L10NLanguages.Count > 0)
+            {
+                var l10n = Incremental.BaselineSidecarIO.LoadL10N(path);
+                return l10n.Tables?.ToDictionary(kv => kv.Key, kv => (kv.Value.ContentHash, kv.Value.Stamp));
+            }
+            var b = Incremental.BaselineSidecarIO.Load(path);
+            return b.Tables?.ToDictionary(kv => kv.Key, kv => (kv.Value.ContentHash, kv.Value.Stamp));
+        }
+        catch (Exception e)
+        {
+            s_logger.Warn(e, "failed to load previous baseline sidecar {Path}, stamp gating disabled", path);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 本次发布的批次时间戳（unix 秒）。读 incremental.exportStamp（脚本发布开始算一次，传给 client/server/lang 三次调用）；
+    /// 未配置 -> 当前 unix 秒（仅单次调用自洽，跨调用需脚本传同一值）。
+    /// </summary>
+    public long GetExportStamp()
+    {
+        var s = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalExportStamp, true, "");
+        if (long.TryParse(s, out var v) && v > 0)
+        {
+            return v;
+        }
+        return DateTimeOffset.UtcNow.ToUnixTimeSeconds();
     }
 
     /// <summary>
@@ -293,9 +363,9 @@ public class GenerationContext
     }
 
     /// <summary>
-    /// L10N 管线：把每种语言的整语言文件 MD5 作为 ChecksumConfig 的一行注入
-    /// （TableName=语言名，Checksum=整语言文件 MD5，SignatureId 共享）。
-    /// 前端/服务器用现有 ChecksumConfig 类按语言名读取，做登录时 per-语言精准比对。
+    /// L10N 管线：把每种语言的版本戳作为 ChecksumConfig 的一行注入
+    /// （TableName=语言名，Stamp=per-language 戳，SignatureId 共享）。
+    /// 戳内容相关（gating 在上次 l10n sidecar 上），前端/服务器用现有 ChecksumConfig 类按语言名读取、比大小。
     /// </summary>
     private void AddL10NLanguageChecksumRecords(DefTable checksumTable, List<Record> checksumRecords)
     {
@@ -310,11 +380,53 @@ public class GenerationContext
             }
         }
 
-        var langMd5s = Incremental.L10NChecksumUtil.ComputePerLanguageFileMd5(this, L10NLanguages, L10NTextKeyFieldName);
-        foreach (var (lang, md5) in langMd5s)
+        foreach (var (lang, stampInfo) in GetL10NLangStamps())
         {
-            checksumRecords.Add(Checksum.ChecksumTableBuilder.CreateChecksumRecord(checksumTable, lang, md5, sharedSig));
+            checksumRecords.Add(Checksum.ChecksumTableBuilder.CreateChecksumRecord(checksumTable, lang, stampInfo.Stamp, sharedSig));
         }
+    }
+
+    /// <summary>
+    /// per-language 版本戳（内容相关）：内容指纹没变 -> 沿用上次戳；变了 -> 批次时间。
+    /// checksumconfig 注入（AddL10NLanguageChecksumRecords）与 l10n sidecar 写入（L10NBaselineWithSidecarExporter）共用，缓存避免重复算。
+    /// </summary>
+    public Dictionary<string, (string ContentHash, long Stamp)> GetL10NLangStamps()
+    {
+        if (_l10nLangStamps != null)
+        {
+            return _l10nLangStamps;
+        }
+
+        var batchTime = GetExportStamp();
+        var prevPath = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalSidecarPath, true, "");
+        Incremental.L10NSidecar prev = null;
+        if (!string.IsNullOrEmpty(prevPath) && File.Exists(prevPath))
+        {
+            try
+            {
+                prev = Incremental.BaselineSidecarIO.LoadL10N(prevPath);
+            }
+            catch (Exception e)
+            {
+                s_logger.Warn(e, "failed to load previous l10n sidecar {Path}, per-language stamp gating disabled", prevPath);
+                prev = null;
+            }
+        }
+
+        var contentHashes = Incremental.L10NChecksumUtil.ComputePerLanguageFileMd5(this, L10NLanguages, L10NTextKeyFieldName);
+        var result = new Dictionary<string, (string, long)>(contentHashes.Count);
+        foreach (var (lang, hash) in contentHashes)
+        {
+            long stamp = batchTime;
+            if (prev != null && prev.Languages.TryGetValue(lang, out var prevLang)
+                && !string.IsNullOrEmpty(prevLang.ContentHash) && prevLang.ContentHash == hash && prevLang.Stamp > 0)
+            {
+                stamp = prevLang.Stamp;
+            }
+            result[lang] = (hash, stamp);
+        }
+        _l10nLangStamps = result;
+        return result;
     }
 
     public GenerationContext()

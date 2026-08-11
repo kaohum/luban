@@ -84,4 +84,10 @@ public static class BuiltinOptionNames
     public const string IncrementalSidecarPath = "incremental.sidecarPath";
 
     public const string IncrementalOutputDir = "incremental.outputDir";
+
+    /// <summary>
+    /// 本次发布的批次时间戳（unix 秒）。脚本发布开始时算一次，传给 client/server/lang 三次基准调用，
+    /// 保证"内容变了"时三方写出同一个新戳。未传时回退到当前 unix 秒（仅单次调用自洽）。
+    /// </summary>
+    public const string IncrementalExportStamp = "incremental.exportStamp";
 }

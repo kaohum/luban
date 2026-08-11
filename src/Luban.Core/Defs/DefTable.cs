@@ -107,10 +107,10 @@ public class DefTable : DefTypeBase
     public List<ITableValidator> Validators { get; } = new();
 
     /// <summary>
-    /// 表数据的校验和（MD5）
-    /// 基于全量数据计算，确保前后端使用相同源数据时获得相同的校验和
+    /// 表数据的内容指纹（全量数据 MD5，不过 group 过滤 -> c/s 同值）。
+    /// 工具内部用于"内容变没变"判断（驱动 Stamp gating）；不直接对外下发。
     /// </summary>
-    public string Checksum { get; set; }
+    public string ContentHash { get; set; } = "";
 
     /// <summary>
     /// 表的结构签名（大写 hex MD5）
@@ -118,6 +118,13 @@ public class DefTable : DefTypeBase
     /// 与 GetTypeId 无关（GetTypeId 是名字 hash、多态判别；本属性不碰它）
     /// </summary>
     public string SignatureId { get; set; } = "";
+
+    /// <summary>
+    /// 内容版本戳（unix 秒，long）。内容相关：基准导出时与上次 sidecar 比内容指纹，
+    /// 没变 -> 沿用上次戳；变了 -> 推进到本次批次时间（incremental.exportStamp）。
+    /// 对外下发到 checksumconfig，供客户端上报、服务器比大小判落后/领先。
+    /// </summary>
+    public long Stamp { get; set; }
 
     public string OutputDataFile => string.IsNullOrWhiteSpace(_outputFile) ? FullName.Replace('.', '_').ToLower() : _outputFile;
 
