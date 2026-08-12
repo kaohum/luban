@@ -41,6 +41,8 @@ public class BinaryDataTarget : DataTargetBase
     public override OutputFile ExportTable(DefTable table, List<Record> records)
     {
         var bytes = new ByteBuf();
+        // 结构签名头：客户端解表(Create)前校验，避免 .bytes 结构与代码 bean 不一致导致解表错乱
+        bytes.WriteString(table.SignatureId);
         WriteList(table, records, bytes);
         return CreateOutputFile($"{table.OutputDataFile}.{OutputFileExt}", bytes.CopyData());
     }

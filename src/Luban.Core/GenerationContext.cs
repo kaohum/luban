@@ -489,6 +489,13 @@ public class GenerationContext
         ExportTypes = CalculateExportTypes();
         ExportBeans = SortBeanTypes(ExportTypes.OfType<DefBean>().ToList());
         ExportEnums = ExportTypes.OfType<DefEnum>().ToList();
+
+        // 提前算结构签名：代码生成(cs-bin 的 ExpectedSignatureId const)需要它，必须在代码生成之前就绪。
+        // 早于数据加载阶段(CalculateTableChecksums 也会算并复用此处结果)。
+        foreach (var table in ExportTables)
+        {
+            table.SignatureId = StructureSignature.ComputeForTable(table);
+        }
     }
 
     public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos()
