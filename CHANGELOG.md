@@ -1,5 +1,19 @@
 ## 变更日志
 
+### 2026-08-12
+
+- **.bytes 注入结构签名头（运行时解表前校验结构版本）**
+  - `BinaryDataTarget.ExportTable` 在写出每张表 `.bytes` 时，开头追加 `WriteString(table.SignatureId)`。客户端 `Create`/`MergeApply`/`Append` 读 `.bytes` 第一件事即比对 `ExpectedSignatureId`，结构不一致直接抛 `SerializationException`，避免按旧结构解新字节产生不可逆错乱（字段错位/越界读）。
+  - 属一次性 baseline bump：仅追加头部，读端需重生成 cs-bin 代码（带 `ExpectedSignatureId` const）+ 重导基准 `.bytes`。
+
+- **结构签名提前到代码生成前计算（GenerationContext.Init）**
+  - `SignatureId` 计算从 `CalculateTableChecksums`（数据加载阶段）提前到 `Init` 末尾（代码生成之前）。cs-bin 模板新增的 `ExpectedSignatureId` const 在代码生成阶段就要取值，此前代码生成时 `SignatureId` 尚未算、const 为空。`CalculateTableChecksums` 复用此处已算结果，不重复计算。
+  - 修改文件：`src/Luban.Core/GenerationContext.cs`、`src/Luban.DataTarget.Builtin/Binary/BinaryDataTarget.cs`。
+
+- **fix: DMap checksum 稳定排序，消除 map 字段表 ContentHash 抖动**
+  - `BinaryChecksumVisitor.DMap` 原直接 `foreach` Dictionary，遍历顺序不确定 → 含 map 字段的表每次导出 ContentHash 都变 → gating 误判"数据变更"、stamp 无谓推进、`checksumconfig.bytes` 抖动。改为 `OrderBy(kv => kv.Key.ToString())` 稳定排序，保证同内容同字节序。
+  - 修改文件：`src/Luban.Core/DataVisitors/BinaryChecksumVisitor.cs`。
+
 ### 2026-08-11
 
 - **checksumconfig 版本值从 MD5 改为内容相关的时间戳 Stamp（long，unix 秒，可比大小）**

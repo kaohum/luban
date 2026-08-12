@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Linq;
 using Luban.Datas;
 using Luban.DataVisitors;
 using Luban.Defs;
@@ -169,7 +170,8 @@ public class BinaryChecksumVisitor : IDataActionVisitor<ByteBuf>
     {
         Dictionary<DType, DType> datas = type.DataMap;
         x.WriteSize(datas.Count);
-        foreach (var e in datas)
+        // 按 key 字符串形式稳定排序，避免 Dictionary 遍历顺序不确定导致 ContentHash 每次变化（gating 误判数据变更）
+        foreach (var e in datas.OrderBy(kv => kv.Key.ToString()))
         {
             e.Key.Apply(this, x);
             e.Value.Apply(this, x);
