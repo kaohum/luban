@@ -39,13 +39,19 @@ public class DString : DType<string>
         {
             case "0":
             case "false":
-                return new DString(s);
+                return new DString(NormalizeNewline(s));
             case "1":
             case "true":
-                return new DString(System.Text.RegularExpressions.Regex.Unescape(s));
+                return new DString(NormalizeNewline(System.Text.RegularExpressions.Regex.Unescape(s)));
             default:
                 throw new Exception($"unknown escape mode:{escapeMode}");
         }
+    }
+
+    // 换行统一为 \n：源 CSV 行尾（CRLF/LF）差异不应影响导出产物中嵌入的文本
+    private static string NormalizeNewline(string s)
+    {
+        return s.IndexOf('\r') >= 0 ? s.Replace("\r\n", "\n") : s;
     }
 
     public override string TypeName => "string";
