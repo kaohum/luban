@@ -5,12 +5,7 @@ namespace {{ __namespace }}
 
 public class {{ __class_name }}
 {
-{{~ $index = 0 ~}}
 {{ for k in __keys -}}
-{{~ $index=$index+1 ~}}
-{{~ if $index > 3000 ~}}
-{{~ break ~}}
-{{~ end ~}}
 {{~ $raw_desc = k.key2 != null ? k.key2 : "" ~}}
 {{~ $desc = $raw_desc | string.replace "\r\n" "\n" | string.replace "\r" "\n" ~}}
 {{~ $desc_lines = $desc | string.split "\n" ~}}

@@ -62,16 +62,24 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
     }
 
     /// <summary>
-    /// 解析 cs-l10n-language.keyTable 配置：
-    /// - 配置时：只从指定的“代码引用语言表”枚举 key（静态字段只覆盖该表）。
-    /// - 未配置时：枚举全部导出表，保持原行为。
+    /// 解析 cs-l10n-language 的 key 过滤配置：
+    /// - keyTable：只从指定的“代码引用语言表”枚举 key（不配置则枚举全部导出表）。
+    /// - keyFlag：按行内 bool 标记字段过滤，仅该字段为 true 的行生成静态字段
+    ///   （标记字段只影响代码生成，不进导出的语言 bin）。
+    /// 两项可叠加：先按表过滤，再按行过滤。均不配置时保持原行为。
     /// </summary>
     private (IReadOnlyList<L10NKeyInfo>, System.Type) GetCodeL10NKeys(GenerationContext ctx)
     {
         string keyTable = EnvManager.Current.GetOptionOrDefault(Name, "keyTable", false, null);
+        string keyFlag = EnvManager.Current.GetOptionOrDefault(Name, "keyFlag", false, null);
+
         if (string.IsNullOrWhiteSpace(keyTable))
         {
-            return ctx.GetL10NKeyInfos();
+            if (string.IsNullOrWhiteSpace(keyFlag))
+            {
+                return ctx.GetL10NKeyInfos();
+            }
+            return ctx.GetL10NKeyInfos(ctx.ExportTables, keyFlag);
         }
 
         var matched = ctx.ExportTables.Where(t =>
@@ -87,7 +95,7 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
                 $"请检查 language schema 中的 table 定义或 lang.conf 中 cs-l10n-language.keyTable 配置。当前可用表：{available}");
         }
 
-        return ctx.GetL10NKeyInfos(matched);
+        return ctx.GetL10NKeyInfos(matched, string.IsNullOrWhiteSpace(keyFlag) ? null : keyFlag);
     }
 }
 

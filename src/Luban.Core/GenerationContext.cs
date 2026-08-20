@@ -513,22 +513,26 @@ public class GenerationContext
     /// <summary>
     /// 仅枚举指定表集合的 l10n key（不写缓存）。
     /// 用于代码生成时只从“代码引用语言表”取 key，而非全部语言表。
+    /// flagFieldName 非空时，进一步按行内 bool 标记字段过滤：仅该字段为 true 的行入选。
     /// </summary>
-    public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos(IReadOnlyList<DefTable> tables)
+    public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos(IReadOnlyList<DefTable> tables, string flagFieldName = null)
     {
         if (!DatasLoaded || L10NLanguages.Count == 0)
         {
             return (Array.Empty<L10NKeyInfo>(), typeof(int));
         }
-        return EnumerateL10NKeys(tables);
+        return EnumerateL10NKeys(tables, flagFieldName);
     }
 
-    private (List<L10NKeyInfo>, System.Type) EnumerateL10NKeys(IReadOnlyList<DefTable> tables)
+    private (List<L10NKeyInfo>, System.Type) EnumerateL10NKeys(IReadOnlyList<DefTable> tables, string flagFieldName = null)
     {
         if (!DatasLoaded || L10NLanguages.Count == 0)
         {
             return (new List<L10NKeyInfo>(), typeof(int));
         }
+
+        bool hasFlagFilter = !string.IsNullOrWhiteSpace(flagFieldName);
+        int flagFieldMatchedTables = 0;
 
         var keyFieldName = L10NTextKeyFieldName;
         var keyFieldDesc = L10NTextKeyFieldDesc;
@@ -550,6 +554,22 @@ public class GenerationContext
                 continue;
             }
 
+            // 行级标记字段过滤：仅收录标记字段为 true 的行（字段缺失的表不贡献 key）
+            DefField flagField = null;
+            if (hasFlagFilter)
+            {
+                flagField = bean.Fields.FirstOrDefault(f => string.Equals(f.Name, flagFieldName, StringComparison.Ordinal));
+                if (flagField == null)
+                {
+                    continue;
+                }
+                if (flagField.CType is not TBool)
+                {
+                    throw new Exception($"[l10n] 表 {table.FullName} 的标记字段 '{flagFieldName}' 类型必须是 bool，当前为 {flagField.CType.TypeName}");
+                }
+                flagFieldMatchedTables++;
+            }
+
             if (!_recordsByTables.TryGetValue(table.FullName, out var tableDataInfo) || tableDataInfo.FinalRecords == null)
             {
                 continue;
@@ -560,6 +580,10 @@ public class GenerationContext
             foreach (var record in tableDataInfo.FinalRecords)
             {
                 if (record.Data is not DBean data)
+                {
+                    continue;
+                }
+                if (flagField != null && data.GetField(flagField.Name) is not DBool { Value: true })
                 {
                     continue;
                 }
@@ -587,6 +611,14 @@ public class GenerationContext
                     keys.Add((keyValue.GetValueObject(), descContent));
                 }
             }
+        }
+
+        if (hasFlagFilter && flagFieldMatchedTables == 0)
+        {
+            var available = string.Join(", ", tables.Select(t => t.FullName));
+            throw new Exception(
+                $"[l10n] 标记字段 '{flagFieldName}' 未在任何多语言表中定义。" +
+                $"请检查 language schema 中 Language bean 是否包含该 bool 字段。当前表集合：{available}");
         }
 
         //keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));

@@ -1,5 +1,19 @@
 ## 变更日志
 
+### 2026-08-20
+
+- **cs-l10n-language 新增 keyFlag 选项：按行级 bool 标记字段过滤 LanguageConfig 静态快链**
+  - 背景：slg 配置工程将 LanguageCode（代码引用 key）与 LanguageText（策划文本 key）两张表合并为单一 `LanguageText` 表（input 仍按分类拆分 8 个 CSV）。“哪些 key 生成静态字段”由“属于哪张表”（`cs-l10n-language.keyTable`）改为表内 `is_code` bool 字段决定。该字段只影响代码生成，不进运行时数据：l10n 合并 bin（`l10n.mergeOutput`）及其 checksum/sidecar/增量 diff 路径只写 key+语言值，标记字段天然不导出。
+  - 新选项 `cs-l10n-language.keyFlag=<字段名>`：仅该字段为 true 的行入选静态 key。可与 `keyTable` 叠加（先按表过滤再按行过滤）；CSV 空单元格按 false 处理。
+  - `GenerationContext.GetL10NKeyInfos(tables)` 增加可选 `flagFieldName` 参数，`EnumerateL10NKeys` 按行过滤。标记字段必须为 bool 类型（是而非 bool 报错）；配置了 keyFlag 但任何多语言表都不含该字段时报错（防静默生成空 LanguageConfig）；个别表缺字段则该表不贡献 key。
+  - slg 侧一次性影响：Language bean 新增字段导致 StructureSignature 变化，升级后必须先跑基准导出再跑增量（增量会按设计报“L10N 结构变化”中止）；l10n sidecar Tables 段旧条目失效、表级戳推进一次。运行时数据不变：已验证合并前后 14 语言 × 1746 key 的 languageconfig.bytes 内容逐条一致，LanguageConfig.cs 525 个静态字段集合不变。
+  - 向后兼容：不配置 keyFlag 行为完全不变（langServer/langAOT 管线已回归验证）；keyTable 选项保留。
+  - 修改文件：`src/Luban.Core/GenerationContext.cs`、`src/Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`。
+
+- **cs-l10n-language 模板（language.sbn）移除 3000 条硬上限**
+  - 原模板中 `{{~ if $index > 3000 ~}} break` 会静默丢弃超出 3000 个的静态 key，本次彻底移除。仅改仓库自带模板；slg 已部署的 Templates/ 为项目定制版（dataMapRef 风格），本无此上限，按现有约定（PostBuild 不部署模板）不受影响。
+  - 修改文件：`src/Luban.CSharp/Templates/cs-l10n-language/language.sbn`。
+
 ### 2026-08-12
 
 - **.bytes 注入结构签名头（运行时解表前校验结构版本）**
