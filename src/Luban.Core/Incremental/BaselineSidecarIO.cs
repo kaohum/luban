@@ -29,6 +29,8 @@ namespace Luban.Incremental;
 /// </summary>
 public static class BaselineSidecarIO
 {
+    private static readonly NLog.Logger s_logger = NLog.LogManager.GetCurrentClassLogger();
+
     private static readonly JsonSerializerOptions s_opt = new() { WriteIndented = true };
 
     /// <summary>
@@ -68,10 +70,20 @@ public static class BaselineSidecarIO
 
     /// <summary>
     /// 加载 L10N 基准 sidecar。
+    /// v1 格式（string Key/Keys，v2 显式 int id 之前）反序列化失败时视为空 sidecar（等价重基准）：
+    /// 迁移时本就删旧 sidecar 全量重基准，无兼容负担；后续结构 gate 会给出"请重新执行基准导出"的明确指引。
     /// </summary>
     public static L10NSidecar LoadL10N(string path)
     {
         var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<L10NSidecar>(json) ?? new L10NSidecar();
+        try
+        {
+            return JsonSerializer.Deserialize<L10NSidecar>(json) ?? new L10NSidecar();
+        }
+        catch (JsonException e)
+        {
+            s_logger.Warn(e, "l10n sidecar {Path} 不是 v2 int 格式（或已损坏），视为空 sidecar（等价首次基准）", path);
+            return new L10NSidecar();
+        }
     }
 }

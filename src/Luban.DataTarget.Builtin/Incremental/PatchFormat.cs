@@ -34,9 +34,16 @@ public static class PatchFormat
     public const string MagicTable = "DLP1";
 
     /// <summary>
-    /// L10N delta patch magic（4 字节 ASCII "LLP1"）。
+    /// L10N delta patch magic（4 字节 ASCII "LLP1"，string key 格式）。
+    /// v2（spec 2026-08-22）已退役：语言键改为显式 int id 后无 string-key 增量路径，
+    /// 保留常量仅作线上存量 patch 的格式鉴别（旧客户端按 magic 拒绝 LLP2，反之亦然）。
     /// </summary>
     public const string MagicL10N = "LLP1";
+
+    /// <summary>
+    /// L10N index 模式 delta patch magic（4 字节 ASCII "LLP2"）。全 id（v2：字段=显式 int 语言 id），无字符串 key。
+    /// </summary>
+    public const string MagicL10N2 = "LLP2";
 
     /// <summary>
     /// 把 4 字节 magic 写入 ByteBuf（逐字节 WriteByte，保证字节序与 ASCII 一致）。

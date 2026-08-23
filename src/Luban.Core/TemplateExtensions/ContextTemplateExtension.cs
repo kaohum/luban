@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using Luban.CodeTarget;
+using Luban.Defs;
 using Scriban.Runtime;
 
 namespace Luban.TemplateExtensions;
@@ -25,6 +27,16 @@ namespace Luban.TemplateExtensions;
 public class ContextTemplateExtension : ScriptObject
 {
 
+    /// <summary>
+    /// 表是否被当前代码目标排除出表级代码生成（{target}.excludeTables）。
+    /// tables_by_tag 等数据层表集合不会经过代码目标的表过滤，
+    /// 模板以其生成表名引用（如 TableNamesWith 数组引用 ConfigNameType 成员）时必须用它排除，
+    /// 否则会引用到不存在的表级符号导致生成代码编译失败。
+    /// </summary>
+    public static bool IsExcludedTable(DefTable table)
+    {
+        return GenerationContext.CurrentCodeTarget is CodeTargetBase codeTarget && codeTarget.IsTableExcluded(table);
+    }
 
     public static bool HasTag(dynamic obj, string attrName)
     {

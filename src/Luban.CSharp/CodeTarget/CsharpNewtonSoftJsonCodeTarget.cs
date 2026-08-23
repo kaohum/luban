@@ -20,6 +20,7 @@
 
 ﻿using Luban.CodeTarget;
 using Luban.CSharp.TemplateExtensions;
+using Luban.CSharp.TypeVisitors;
 using Scriban;
 
 namespace Luban.CSharp.CodeTarget;
@@ -27,6 +28,13 @@ namespace Luban.CSharp.CodeTarget;
 [CodeTarget("cs-newtonsoft-json")]
 public class CsharpNewtonSoftJsonCodeTarget : CsharpCodeTargetBase
 {
+    public override void ValidateDefinition(GenerationContext ctx)
+    {
+        // fail-fast 须先于基类的"未适配目标"WARN,避免同一目标先 WARN 后报错
+        L10NTextIndexTypeUtil.EnsureSupportedForIndexMode(Name, ctx, ctx.ExportBeans);
+        base.ValidateDefinition(ctx);
+    }
+
     protected override void OnCreateTemplateContext(TemplateContext ctx)
     {
         base.OnCreateTemplateContext(ctx);

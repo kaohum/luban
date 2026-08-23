@@ -20,5 +20,30 @@
 
 namespace Luban;
 
-public record L10NKeyInfo(object Key, string FieldName, string Key2);
+/// <summary>
+/// 一条本地化 key 的枚举结果（v2 显式 int id 形态，spec 2026-08-22 D7）。
+/// <see cref="Id"/> 烘进访问器 Get(id)；<see cref="FieldName"/> 取自语言表 name 列
+/// （无 name 列的空间退化为 id 派生，如 server space）；<see cref="Desc"/> 供 XML 注释。
+/// </summary>
+public class L10NKeyInfo
+{
+    /// <summary>显式 int 语言 id（表内 id 列）。-1 = 无 int id 的过渡形态（旧 string key 单值路径）。</summary>
+    public int Id { get; }
 
+    /// <summary>name 列原始值（人读标识）；语言表无 name 列时为 null。</summary>
+    public string Name { get; }
+
+    /// <summary>由 name 列（或退化为 id/key）清洗出的合法 C# 标识符（清洗后冲突时带 _2 等后缀）。</summary>
+    public string FieldName { get; }
+
+    /// <summary>描述（desc 字段）内容，用于生成 XML 注释。</summary>
+    public string Desc { get; }
+
+    public L10NKeyInfo(int id, string name, string fieldName, string desc)
+    {
+        Id = id;
+        Name = name;
+        FieldName = fieldName;
+        Desc = desc;
+    }
+}

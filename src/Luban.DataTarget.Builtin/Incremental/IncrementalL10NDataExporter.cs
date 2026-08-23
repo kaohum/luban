@@ -24,9 +24,9 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Luban.DataTarget;
-using Luban.Datas;
 using Luban.Defs;
 using Luban.Incremental;
+using Luban.L10N;
 using Luban.Serialization;
 using Luban.Types;
 using Luban.TypeVisitors;
@@ -36,82 +36,164 @@ namespace Luban.DataExporter.Builtin.Incremental;
 
 /// <summary>
 /// L10N 增量导出器。
-/// 读 L10N sidecar -> 结构 gate（Language bean SignatureId）-> per-语言 key->value 行级 diff -> 出 LLP1 patch + _l10n.delta.manifest。
-/// diff 单位 = (语言, 文本 key)；新增 key -> 所有语言各 upsert；删除 key -> 所有语言各 delete；改某语言文案 -> 只该语言 upsert。
+/// 读 L10N sidecar -> 结构 gate（Language bean SignatureId）-> per-语言 id->value 行级 diff -> 出 patch + _l10n.delta.manifest。
+/// v2（spec 2026-08-22）：语言键 = 显式 int id（语言表 id 列），LLP2 是唯一增量路径
+/// （diff 单位 = (语言, id)；新增 id -> 所有语言各 upsert；删除 id -> 所有语言各 delete；改某语言文案 -> 只该语言 upsert）；
+/// 旧 LLP1（string key diff）随 v2 退役——未配置 indexMode space 时直接报错指路。
+/// run 末尾回写 sidecar KeyEntries（id 注册表幂等关键）。
 /// </summary>
 [DataExporter("incremental-l10n-bin-split")]
 public class IncrementalL10NDataExporter : DataExporterBase
 {
     public override void Handle(GenerationContext ctx, IDataTarget dataTarget, OutputFileManifest manifest)
     {
-        var sidecarPath = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalSidecarPath, true, "");
+        // v2：只有 indexMode space 路径（LLP2，id 语义）；旧 string-key LLP1 路径已随显式 int id 退役
+        if (!ctx.L10NSpaces.Any(s => s.IndexMode))
+        {
+            throw new InvalidOperationException(
+                "[incremental-l10n] v2 语言增量需要 indexMode space：语言键已改为显式 int id（语言表 id 列），旧 string-key LLP1 路径已退役。" +
+                "请配置 l10n.*.indexMode=true（如 l10n.main.indexMode）或改用 omnibus-incremental。");
+        }
+
+        var spaceSidecarPath = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalSidecarPath, true, "");
+        HandleIndexMode(ctx, manifest, spaceSidecarPath);
+    }
+
+    /// <summary>
+    /// indexMode space 路径：LLP2 全 id 语言增量 patch。
+    /// diff 基准 = sidecar 基准快照（Keys/Languages.Hashes，基准时刻活 id 的紧凑视图），语义为"累计对基准"：
+    /// 基准快照内的 id 按基准 hash 比对（变化 upsert / 消失或墓碑 delete）；
+    /// 不在基准快照的活 id（基准后追加或墓碑复活）恒 upsert。
+    /// run 末尾回写 sidecar KeyEntries（id 注册表，幂等关键），但不动基准快照（Keys/Languages）。
+    /// </summary>
+    private static void HandleIndexMode(GenerationContext ctx, OutputFileManifest manifest, string sidecarPath)
+    {
         if (string.IsNullOrEmpty(sidecarPath))
         {
             throw new InvalidOperationException("[incremental-l10n] 未配置 incremental.sidecarPath，无法 diff。请先跑基准导出。");
         }
 
-        var baseline = BaselineSidecarIO.LoadL10N(sidecarPath);
+        var changed = new List<DeltaManifestEntry>();
+        // per-language stamp：旧入口沿用全表口径（omnibus-incremental 调 HandleSpace 时按 space 口径计算）
+        var langStamps = ctx.GetL10NLangStamps();
+        string firstSig = "";
+        string firstSidecarPath = "";
 
-        // 结构 gate：全语言共享一个 SignatureId
-        string curSig = "";
-        foreach (var t in ctx.Tables)
+        foreach (var space in ctx.L10NSpaces.Where(s => s.IndexMode))
         {
-            if (t.ValueTType is TBean)
+            var sig = HandleSpace(ctx, space, manifest, changed, langStamps);
+            if (string.IsNullOrEmpty(firstSig))
             {
-                curSig = StructureSignature.ComputeForTable(t);
-                break;
+                firstSig = sig;
+                firstSidecarPath = space.SidecarPath;
             }
         }
+
+        // _l10n.delta.manifest（本导出器单独使用时仍写；omnibus-incremental 调 HandleSpace 后统一与普通表 _delta.manifest 合并）
+        var deltaManifest = new DeltaManifest { BaselineSignatureId = firstSig, SidecarPath = firstSidecarPath, ChangedTables = changed };
+        manifest.AddFile(new OutputFile
+        {
+            File = "_l10n.delta.manifest",
+            Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(deltaManifest, new JsonSerializerOptions { WriteIndented = true })),
+        });
+    }
+
+    /// <summary>
+    /// 单个 indexMode space 的 LLP2 增量（HandleIndexMode 的循环体抽出，供 omnibus-incremental 按 space 复用）：
+    /// 结构 gate -> per-语言 (id, value) 行级 diff -> patch 文件入 manifest、条目追加 entries（Table=语言名，
+    /// Stamp 取 langStamps——单独使用传全表口径 GetL10NLangStamps()，omnibus 传 per-space 口径 GetL10NSpaceLangStamps(space)，
+    /// 后者与 space sidecar / space checksumconfig 语言行同值）-> id 注册表回写 space.SidecarPath（只更新 KeyEntries，
+    /// 基准快照不动，保证后续增量仍以同一份基准快照 diff）。返回该 space 通过 gate 的基准 SignatureId。
+    /// v2：LLP2 字段为显式 int 语言 id（不再是数组注册表位置），布局不变（magic+sig+varint upsertCount+
+    /// (int id, string value)*+varint delCount+int id*）；id 即键，无需下标换算，基准 id 缺失于注册表时
+    /// 自然落 delete 分支（sidecar 损伤自愈为"该 id 已删除"）。
+    /// </summary>
+    internal static string HandleSpace(GenerationContext ctx, L10NSpace space, OutputFileManifest manifest,
+        List<DeltaManifestEntry> entries, Dictionary<string, (string ContentHash, long Stamp)> langStamps)
+    {
+        if (string.IsNullOrEmpty(space.SidecarPath))
+        {
+            throw new InvalidOperationException(
+                $"[incremental-l10n] space '{space.Name}' 未配置 l10n.{space.Name}.sidecar，index 模式增量 diff 需要注册表 sidecar。");
+        }
+        if (space.KeyIndex == null)
+        {
+            throw new InvalidOperationException(
+                $"[incremental-l10n] space '{space.Name}' 的 id 注册表未构建（KeyIndex == null），无法做 index 模式 diff。");
+        }
+
+        var baseline = BaselineSidecarIO.LoadL10N(space.SidecarPath);
+        var spaceTables = L10NKeyIndexBuilder.MatchTables(ctx, space);
+
+        // 结构 gate：space 内全语言共享一个 SignatureId
+        var sigTable = spaceTables.FirstOrDefault(t => t.ValueTType is TBean);
+        if (sigTable == null)
+        {
+            string tableList = string.Join(",", space.Tables);
+            throw new InvalidOperationException(
+                $"[incremental-l10n] space '{space.Name}' 的表名单（{tableList}）未命中任何 bean 结构语言表，无法计算结构签名。");
+        }
+        string curSig = StructureSignature.ComputeForTable(sigTable);
         if (string.IsNullOrEmpty(baseline.SignatureId) || curSig != baseline.SignatureId)
         {
             throw new InvalidOperationException(
-                $"[增量导出已终止] L10N 结构变化：SignatureId 期望 {baseline.SignatureId} 实际 {curSig}。请重新执行基准导出。\n本次未产出任何 delta 文件。");
+                $"[增量导出已终止] L10N space '{space.Name}' 结构变化：SignatureId 期望 {baseline.SignatureId} 实际 {curSig}。请重新执行基准导出。\n本次未产出任何 delta 文件。");
         }
 
-        var languages = ctx.L10NLanguages;
-        var keyFieldName = ctx.L10NTextKeyFieldName;
-        var mergeOutput = EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily, "mergeOutput", false, "languageconfig");
-        var perLang = BuildCurrent(ctx, languages, keyFieldName);
+        // 当前值：space 名单表合并 -> lang -> (id, value)（BuildPerLanguageMap 的 space 限定版）
+        var perLang = L10NChecksumUtil.BuildPerLanguageMap(ctx, space.Languages, space.KeyFieldName, spaceTables);
 
-        var changed = new List<DeltaManifestEntry>();
-        var langStamps = ctx.GetL10NLangStamps();
-        foreach (var lang in languages)
+        // v2：id 即键，无注册表位置换算。当前墓碑集 = 注册表内 Deleted 的 id（活 id 复活在构建期已并回 live）。
+        var registry = space.KeyIndex.Entries;
+        var tombstonedIds = new HashSet<int>();
+        foreach (var e in registry)
+        {
+            if (e.Deleted)
+            {
+                tombstonedIds.Add(e.Id);
+            }
+        }
+        var baseKeySet = new HashSet<int>(baseline.Keys);
+
+        foreach (var lang in space.Languages)
         {
             var cur = perLang.GetValueOrDefault(lang) ?? new Dictionary<object, string>();
-            var curStr = new Dictionary<string, string>(cur.Count);
+            var curInt = new Dictionary<int, string>(cur.Count);
             foreach (var kv in cur)
             {
-                curStr[kv.Key.ToString()] = kv.Value ?? "";
+                curInt[L10NChecksumUtil.ToIntId(kv.Key)] = kv.Value ?? "";
             }
-            var curKeys = new HashSet<string>(curStr.Keys, StringComparer.Ordinal);
-
             var baseHashes = baseline.Languages.GetValueOrDefault(lang)?.Hashes; // 与 baseline.Keys 下标对齐
-            var upserts = new List<KeyValuePair<string, string>>();
-            var deletes = new List<string>();
+            int baseHashCount = baseHashes?.Count ?? 0;
+            var upserts = new List<(int Id, string Value)>();
+            var deletes = new List<int>();
 
-            // 1) 遍历共享 Keys：当前无 -> delete；当前有但 hash 变 -> upsert
-            for (int i = 0; i < baseline.Keys.Count && baseHashes != null; i++)
+            // 1) 基准快照内的 id：当前无（或已墓碑）-> delete；当前有但 hash 变 -> upsert
+            for (int i = 0; i < baseline.Keys.Count && i < baseHashCount; i++)
             {
                 var k = baseline.Keys[i];
-                if (!curKeys.Contains(k))
+                if (tombstonedIds.Contains(k) || !curInt.TryGetValue(k, out var curVal))
                 {
                     deletes.Add(k);
+                    continue;
                 }
-                else
+                var md5 = FileUtil.CalcMD5(System.Text.Encoding.UTF8.GetBytes(curVal ?? ""));
+                if (baseHashes[i] != md5)
                 {
-                    var md5 = FileUtil.CalcMD5(System.Text.Encoding.UTF8.GetBytes(curStr[k] ?? ""));
-                    if (baseHashes[i] != md5)
-                    {
-                        upserts.Add(new KeyValuePair<string, string>(k, curStr[k]));
-                    }
+                    upserts.Add((k, curVal ?? ""));
                 }
             }
-            // 2) 当前有而基准 Keys 没有 -> upsert（新增 key）
-            foreach (var kv in curStr)
+            // 2) 不在基准快照的活 id（基准后新增，或墓碑复活）：全部 upsert。
+            //    baseHashCount == 0（该语言不在基准快照里）时连基准 id 一起 upsert，对齐"新语言全量"语义。
+            foreach (var e in registry)
             {
-                if (baseHashes == null || !baseline.Keys.Contains(kv.Key))
+                if (e.Deleted || (baseHashCount > 0 && baseKeySet.Contains(e.Id)))
                 {
-                    upserts.Add(kv);
+                    continue;
+                }
+                if (curInt.TryGetValue(e.Id, out var v))
+                {
+                    upserts.Add((e.Id, v ?? ""));
                 }
             }
 
@@ -121,23 +203,23 @@ public class IncrementalL10NDataExporter : DataExporterBase
             }
 
             var buf = new ByteBuf();
-            PatchFormat.WriteMagic(buf, PatchFormat.MagicL10N);
+            PatchFormat.WriteMagic(buf, PatchFormat.MagicL10N2);
             buf.WriteString(baseline.SignatureId);
             buf.WriteSize(upserts.Count);
-            foreach (var kv in upserts)
+            foreach (var (id, val) in upserts)
             {
-                buf.WriteString(kv.Key);
-                buf.WriteString(kv.Value ?? "");
+                buf.WriteInt(id);
+                buf.WriteString(val);
             }
             buf.WriteSize(deletes.Count);
-            foreach (var k in deletes)
+            foreach (var id in deletes)
             {
-                buf.WriteString(k);
+                buf.WriteInt(id);
             }
 
-            var patchFile = $"{lang}/{mergeOutput}.patch.bytes";
+            string patchFile = $"{space.OutputDir}/{lang}/{space.OutputFile}.patch.bytes";
             manifest.AddFile(new OutputFile { File = patchFile, Content = buf.CopyData() });
-            changed.Add(new DeltaManifestEntry
+            entries.Add(new DeltaManifestEntry
             {
                 Table = lang,
                 UpsertCount = upserts.Count,
@@ -147,20 +229,10 @@ public class IncrementalL10NDataExporter : DataExporterBase
             });
         }
 
-        // _l10n.delta.manifest
-        var deltaManifest = new DeltaManifest { BaselineSignatureId = baseline.SignatureId, SidecarPath = sidecarPath, ChangedTables = changed };
-        manifest.AddFile(new OutputFile
-        {
-            File = "_l10n.delta.manifest",
-            Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(deltaManifest, new JsonSerializerOptions { WriteIndented = true })),
-        });
-    }
-
-    /// <summary>
-    /// 合并所有语言表 -> perLang[lang] = key -> value（镜像 ExportL10NMergedPerLanguage 的合并语义）。
-    /// </summary>
-    private static Dictionary<string, Dictionary<object, string>> BuildCurrent(GenerationContext ctx, IReadOnlyList<string> languages, string keyFieldName)
-    {
-        return L10NChecksumUtil.BuildPerLanguageMap(ctx, languages, keyFieldName);
+        // id 注册表回写（幂等关键）：只更新 KeyEntries，基准快照（Keys/Languages/Tables）不动，
+        // 保证后续增量仍以同一份基准快照 diff（累计对基准语义）。
+        baseline.KeyEntries = space.KeyIndex.Entries;
+        BaselineSidecarIO.SaveL10N(space.SidecarPath, baseline);
+        return baseline.SignatureId;
     }
 }

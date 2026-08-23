@@ -77,6 +77,12 @@ public static class BuiltinOptionNames
 
     public const string FileEncoding = "fileEncoding";
 
+    /// <summary>
+    /// 代码目标级表排除名单（{targetName}.excludeTables，逗号分隔表名，OrdinalIgnoreCase 匹配 Name 与 FullName）。
+    /// 被排除的表不生成表级代码（表类 / Tables manager 条目 / 表派生枚举项），record bean 类不受影响。
+    /// </summary>
+    public const string ExcludeTables = "excludeTables";
+
     public const string CsvSourceOutputDir = "csvSourceOutputDir";
 
     public const string IncrementalFamily = "incremental";

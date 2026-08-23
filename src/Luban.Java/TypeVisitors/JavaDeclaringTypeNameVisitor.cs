@@ -71,6 +71,10 @@ public class JavaDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
 
     public string Accept(TString type)
     {
+        if (GenerationContext.Current.L10NTextIndexEnabled && type.HasTag("text"))
+        {
+            return "int";
+        }
         return "String";
     }
 

@@ -29,6 +29,14 @@ public class DefField
 {
     private static readonly NLog.Logger s_logger = NLog.LogManager.GetCurrentClassLogger();
 
+    /// <summary>
+    /// 字段级 tags 标记（AF-2）：字段仅在导出管线内部使用（如 l10n 行级标记 is_code 驱动静态访问器生成），
+    /// 不进入任何数据序列化产物（bin/json/xml/yaml/csv 等），也不生成运行时读写代码；
+    /// 数据加载照常填充该字段，管线（如 keyFlag 过滤）仍可从加载行读取。
+    /// schema 写法：xml `tags="export_only"`；excel 头部 `&amp;export_only`。
+    /// </summary>
+    public const string ExportOnlyTag = "export_only";
+
     public DefAssembly Assembly => HostType.Assembly;
 
     public DefBean HostType { get; }
@@ -60,6 +68,9 @@ public class DefField
     public string CurrentVariantNameWithFieldNameOrOrigin => CurrentVariantNameWithFieldName ?? Name;
 
     public bool IgnoreNameValidation { get; set; }
+
+    /// <summary>导出期专用字段（tags 标记 <see cref="ExportOnlyTag"/>）：对所有目标都不序列化、不生成代码。</summary>
+    public bool IsExportOnly => HasTag(ExportOnlyTag);
 
     public bool HasTag(string attrName)
     {

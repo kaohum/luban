@@ -29,6 +29,11 @@ public class NeedInitFieldVisitor : AllFalseVisitor
 
     public override bool Accept(TString type)
     {
+        if (L10NTextIndexTypeUtil.IsTextIndex(type))
+        {
+            // text 字段在 L10N index 模式下按 int 处理,与 TInt 一致无需 init
+            return false;
+        }
         return true;
     }
 

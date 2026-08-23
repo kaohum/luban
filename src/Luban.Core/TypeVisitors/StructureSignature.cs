@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Linq;
 using System.Text;
 using Luban.Defs;
 using Luban.Types;
@@ -55,7 +56,10 @@ public static class StructureSignature
         for (int i = 0; i < bean.Fields.Count; i++)
         {
             var f = bean.Fields[i];
-            sb.Append("F|").Append(i).Append('|').Append(f.Name).Append('|').Append(f.CType.IsNullable).Append('|');
+            // export_only 参与（且仅它参与）字段级签名：该标记改变序列化形状（字段不再写出），
+            // 必须触发 SignatureId 变化；其余字段 tags 仍是纯元数据，不参与（避免无关签名抖动）。
+            sb.Append("F|").Append(i).Append('|').Append(f.Name).Append('|').Append(f.CType.IsNullable)
+              .Append(f.IsExportOnly ? "|export_only" : "").Append('|');
             AppendType(sb, f.CType, visited);
             sb.Append('\n');
         }
@@ -67,7 +71,7 @@ public static class StructureSignature
         }
     }
 
-    private static void AppendType(StringBuilder sb, TType t, HashSet<DefBean> visited)
+    internal static void AppendType(StringBuilder sb, TType t, HashSet<DefBean> visited)
     {
         switch (t)
         {
@@ -81,7 +85,15 @@ public static class StructureSignature
             case TList l: sb.Append("List:"); AppendType(sb, l.ElementType, visited); break;
             case TSet s: sb.Append("Set:"); AppendType(sb, s.ElementType, visited); break;
             case TMap m: sb.Append("Map:"); AppendType(sb, m.KeyType, visited); AppendType(sb, m.ValueType, visited); break;
-            default: sb.Append("P:").Append(t.GetType().Name); break; // TBool/TInt/TString/TDateTime/TDay...
+            default:
+                sb.Append("P:").Append(t.GetType().Name);
+                // tags 参与签名:string->text 等仅加标签的类型迁移必须触发 SignatureId 变化(重新基准)
+                if (t.Tags.Count > 0)
+                {
+                    sb.Append("|tags=").Append(string.Join(",", t.Tags.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                        .Select(kv => kv.Key + "=" + kv.Value)));
+                }
+                break; // TBool/TInt/TString/TDateTime/TDay...
         }
     }
 }

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="xunit" Version="2.7.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Luban.Core\Luban.Core.csproj" />
+    <ProjectReference Include="..\Luban.CSharp\Luban.CSharp.csproj" />
+    <ProjectReference Include="..\Luban.DataLoader.Builtin\Luban.DataLoader.Builtin.csproj" />
+    <ProjectReference Include="..\Luban.DataTarget.Builtin\Luban.DataTarget.Builtin.csproj" />
+    <ProjectReference Include="..\Luban.DataValidator.Builtin\Luban.DataValidator.Builtin.csproj" />
+    <ProjectReference Include="..\Luban.L10N\Luban.L10N.csproj" />
+    <ProjectReference Include="..\Luban.Schema.Builtin\Luban.Schema.Builtin.csproj" />
+  </ItemGroup>
+</Project>

@@ -32,14 +32,25 @@ namespace Luban.DataExporter.Builtin;
 
 /// <summary>
 /// 将带有多语言列的表按语言拆分成独立的二进制文件：
-/// - 使用 ByteBuf 写出简单的 {key:string, value:string} 映射
-/// - 每种语言一个文件：{lang}/{TableName}.bytes
+/// - 使用 ByteBuf 写出 {key, value} 映射（v2：key = 显式 int 语言 id，即 int 键紧凑字典，spec D3）
+/// - 每种语言一个文件：{lang}/{TableName}.bytes（逐表）；配置 mergeOutput 时合并为 {lang}/{outputFile}.bytes
 /// - 仅对 bin DataTarget 生效，其它 DataTarget 走默认逻辑
 /// 使用方式：在 conf 中配置 dataExporter = "l10n-bin-split"，并配置 dataTargets 包含 "bin"。
 /// </summary>
 [DataExporter("l10n-bin-split")]
 public class L10NBinarySplitDataExporter : DataExporterBase
 {
+    /// <summary>
+    /// space 复用（omnibus-baseline 的非 indexMode space）时的语言覆盖；null = 用 ctx.L10NLanguages（旧行为）。
+    /// </summary>
+    internal IReadOnlyList<string> LanguageScope { get; set; }
+
+    /// <summary>space 复用时的 key 字段覆盖；null = 用 ctx.L10NTextKeyFieldName（旧行为）。</summary>
+    internal string KeyFieldScope { get; set; }
+
+    /// <summary>space 复用时的输出根前缀（相对 dataTarget 输出根目录，即 space.OutputDir）；空 = 根目录（旧行为）。</summary>
+    internal string OutputDirPrefix { get; set; } = "";
+
     private static bool KeepMergedBin()
     {
         // 是否保留原始“合并语言”的二进制（默认为 false，只导出按语言拆分后的文件）
@@ -127,7 +138,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
     }
 
     internal static void ExportL10NTablePerLanguage(DefTable table, List<Record> records,
-        string keyFieldName, IReadOnlyList<string> languages, OutputFileManifest manifest)
+        string keyFieldName, IReadOnlyList<string> languages, OutputFileManifest manifest, string outputDirPrefix = null)
     {
         if (table.ValueTType is not TBean tbean)
         {
@@ -190,6 +201,10 @@ public class L10NBinarySplitDataExporter : DataExporterBase
 
             byte[] bytes = SerializeDictionaryToBinary(map, keyField.CType);
             string path = BuildLanguageFilePath(langField.Name, table);
+            if (!string.IsNullOrEmpty(outputDirPrefix))
+            {
+                path = Path.Combine(outputDirPrefix, path);
+            }
 
             manifest.AddFile(new OutputFile
             {
@@ -200,11 +215,16 @@ public class L10NBinarySplitDataExporter : DataExporterBase
     }
 
     /// <summary>
-    /// 把多张多语言表的记录按语言合并进同一个二进制文件：{lang}/{outputFileName}.bytes。
+    /// 把多张多语言表的记录按语言合并进同一个二进制文件：{outputDirPrefix}/{lang}/{outputFileName}.bytes。
     /// 典型场景：LanguageCode 表（代码引用 key）与 LanguageText 表（策划文本 key）合并导出一个运行时 bin。
+    /// v2（spec 2026-08-22）：语言 key 为显式 int（keyType=TInt），序列化即 int 键紧凑字典
+    /// [WriteSize: count] [WriteKey(id) WriteString(value)]*——indexMode space（main/aot）与
+    /// server space 统一走本路径，数组格式（ExportL10NArrayPerLanguage）已退役删除。
+    /// outputDirPrefix 供 omnibus 的 space 路由传入 space.OutputDir；null/空 = 根目录（旧行为）。
     /// </summary>
     internal static void ExportL10NMergedPerLanguage(GenerationContext ctx, IReadOnlyList<DefTable> tables,
-        string keyFieldName, IReadOnlyList<string> languages, OutputFileManifest manifest, string outputFileName)
+        string keyFieldName, IReadOnlyList<string> languages, OutputFileManifest manifest, string outputFileName,
+        string outputDirPrefix = null)
     {
         // 仅保留 value 为 bean、含合法 key 字段、且至少有一个语言字段的表
         var mergedTables = new List<(DefTable Table, DefBean Bean, DefField KeyField)>();
@@ -300,7 +320,9 @@ public class L10NBinarySplitDataExporter : DataExporterBase
             }
 
             byte[] bytes = SerializeDictionaryToBinary(map, unifiedKeyType);
-            string path = Path.Combine(lang, outputFileName + ".bytes");
+            string path = string.IsNullOrEmpty(outputDirPrefix)
+                ? Path.Combine(lang, outputFileName + ".bytes")
+                : Path.Combine(outputDirPrefix, lang, outputFileName + ".bytes");
 
             manifest.AddFile(new OutputFile
             {
@@ -319,7 +341,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
             return;
         }
 
-        var languages = ctx.L10NLanguages;
+        var languages = LanguageScope ?? ctx.L10NLanguages;
         // 未配置任何语言时，完全复用默认行为
         if (languages.Count == 0)
         {
@@ -327,13 +349,16 @@ public class L10NBinarySplitDataExporter : DataExporterBase
             return;
         }
 
-        string keyFieldName = ctx.L10NTextKeyFieldName;
+        string keyFieldName = KeyFieldScope ?? ctx.L10NTextKeyFieldName;
         bool keepMerged = KeepMergedBin();
 
-        var tables = dataTarget.ExportAllRecords ? ctx.Tables : ctx.ExportTables;
+        // TableFilter != null 表示被 omnibus-baseline 以 space 范围复用（只保留该 space 的表）；
+        // 此时 mergeOutput（全局合并文件名）不适用，根目录 checksumconfig 也由组合导出器按 space 拆分输出。
+        bool spaceScoped = TableFilter != null;
+        var tables = SelectTables(ctx, dataTarget);
 
         // 配置了 l10n.mergeOutput：把多张语言表按语言合并导出单一 bin，跳过逐表逻辑
-        string mergeOutput = GetMergeOutputFile();
+        string mergeOutput = spaceScoped ? null : GetMergeOutputFile();
         if (!string.IsNullOrWhiteSpace(mergeOutput))
         {
             ExportL10NMergedPerLanguage(ctx, tables, keyFieldName, languages, manifest, mergeOutput);
@@ -346,8 +371,8 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         {
             var records = ctx.GetTableExportDataList(table);
 
-            // 先尝试按语言拆分导出
-            ExportL10NTablePerLanguage(table, records, keyFieldName, languages, manifest);
+            // 先尝试按语言拆分导出（space 复用时输出根 = space.OutputDir）
+            ExportL10NTablePerLanguage(table, records, keyFieldName, languages, manifest, OutputDirPrefix);
 
             // 可选：是否保留原始"合并语言"的二进制文件
             if (keepMerged)
@@ -355,11 +380,26 @@ public class L10NBinarySplitDataExporter : DataExporterBase
                 var defaultFile = dataTarget.ExportTable(table, records);
                 if (defaultFile != null)
                 {
+                    if (!string.IsNullOrEmpty(OutputDirPrefix))
+                    {
+                        defaultFile = new OutputFile
+                        {
+                            File = Path.Combine(OutputDirPrefix, defaultFile.File),
+                            Content = defaultFile.Content,
+                            Encoding = defaultFile.Encoding,
+                        };
+                    }
                     manifest.AddFile(defaultFile);
                 }
             }
         }
 
+        if (spaceScoped)
+        {
+            // space 范围运行：根目录 checksumconfig 由 omnibus-baseline 统一输出（space 目录 + 仅语言行），
+            // 此处跳过，避免与普通表管线的根目录 checksumconfig 重复。
+            return;
+        }
         // 语言管线也导出 checksum 表（含 per-language 行），供前端/服务器按语言比对
         ExportChecksumTable(ctx, dataTarget, tables, manifest);
     }

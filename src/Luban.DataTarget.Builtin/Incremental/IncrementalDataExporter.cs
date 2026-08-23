@@ -44,6 +44,21 @@ public class IncrementalDataExporter : DataExporterBase
 {
     public override void Handle(GenerationContext ctx, IDataTarget dataTarget, OutputFileManifest manifest)
     {
+        var (changedTables, sidecarPath) = CollectDelta(ctx, manifest);
+
+        // _delta.manifest（服务器侧 patch 索引）
+        WriteDeltaManifestFile(manifest, new DeltaManifest { SidecarPath = sidecarPath, ChangedTables = changedTables });
+    }
+
+    /// <summary>
+    /// 增量 diff 主体（sidecar 读取 + 结构 gate + 行级 diff），DLP1 patch 文件直接入 manifest；
+    /// 返回（delta 条目, sidecar 路径），不写 _delta.manifest——
+    /// 单独使用时由 Handle 落盘；omnibus-incremental 组合时收集条目与语言条目合并成单份 manifest。
+    /// TableFilter != null（组合导出）时被过滤的表不参与结构 gate 与行 diff（space 表由组合导出器的 space 逻辑接管），
+    /// 与 BaselineWithSidecarExporter.WriteSidecar 的过滤同一语义：普通 baseline sidecar 本就不含 space 表。
+    /// </summary>
+    internal (List<DeltaManifestEntry> Entries, string SidecarPath) CollectDelta(GenerationContext ctx, OutputFileManifest manifest)
+    {
         var sidecarPath = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalSidecarPath, true, "");
         if (string.IsNullOrEmpty(sidecarPath))
         {
@@ -56,9 +71,16 @@ public class IncrementalDataExporter : DataExporterBase
             throw new InvalidOperationException($"[incremental] sidecar target 不匹配：sidecar={baseline.Target}，当前={ctx.Target.Name}");
         }
 
+        // 本次参与增量 diff 的表集合（TableFilter=null 时即 ctx.Tables，行为不变）
+        var tables = ctx.Tables;
+        if (TableFilter != null)
+        {
+            tables = tables.Where(t => !TableFilter(t)).ToList();
+        }
+
         // 第一遍：结构 gate（全表扫，收集所有不一致，一次性报全）
         var offenders = new List<(string Table, string Reason)>();
-        foreach (var table in ctx.Tables)
+        foreach (var table in tables)
         {
             if (table.Name == ChecksumTableBuilder.ChecksumTableName)
             {
@@ -78,7 +100,7 @@ public class IncrementalDataExporter : DataExporterBase
         }
         foreach (var kv in baseline.Tables)
         {
-            if (!ctx.Tables.Any(t => t.FullName == kv.Key))
+            if (!tables.Any(t => t.FullName == kv.Key))
             {
                 offenders.Add((kv.Key, "当前已移除（删除表）"));
             }
@@ -98,7 +120,7 @@ public class IncrementalDataExporter : DataExporterBase
 
         // 第二遍：行 diff（仅结构全一致时）
         var changedTables = new List<DeltaManifestEntry>();
-        foreach (var table in ctx.Tables)
+        foreach (var table in tables)
         {
             if (table.Name == ChecksumTableBuilder.ChecksumTableName)
             {
@@ -156,8 +178,15 @@ public class IncrementalDataExporter : DataExporterBase
             });
         }
 
-        // _delta.manifest（服务器侧 patch 索引）
-        var deltaManifest = new DeltaManifest { SidecarPath = sidecarPath, ChangedTables = changedTables };
+        return (changedTables, sidecarPath);
+    }
+
+    /// <summary>
+    /// 写 _delta.manifest（服务器侧 patch 索引）。
+    /// 单独使用（incremental）与组合导出（omnibus-incremental 的合并 manifest）共用同一文件名与序列化。
+    /// </summary>
+    internal static void WriteDeltaManifestFile(OutputFileManifest manifest, DeltaManifest deltaManifest)
+    {
         manifest.AddFile(new OutputFile
         {
             File = "_delta.manifest",

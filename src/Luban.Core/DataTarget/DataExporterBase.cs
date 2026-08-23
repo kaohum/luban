@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System;
+using System.Linq;
 using Luban.Defs;
 
 namespace Luban.DataTarget;
@@ -26,10 +28,24 @@ public abstract class DataExporterBase : IDataExporter
 {
     public const string FamilyPrefix = "dataExporter";
 
+    /// <summary>
+    /// 组合导出（omnibus-baseline）时排除部分表（返回 true = 跳过该表，由组合导出器另行接管）；
+    /// null = 不过滤（默认，行为与原先完全一致）。
+    /// </summary>
+    public Func<DefTable, bool> TableFilter { get; set; }
+
+    /// <summary>
+    /// 解析本次导出的表集合（ExportAllRecords ? 全部表 : 导出表），并应用 TableFilter。
+    /// </summary>
+    protected List<DefTable> SelectTables(GenerationContext ctx, IDataTarget dataTarget)
+    {
+        var tables = dataTarget.ExportAllRecords ? ctx.Tables : ctx.ExportTables;
+        return TableFilter != null ? tables.Where(t => !TableFilter(t)).ToList() : tables;
+    }
 
     public virtual void Handle(GenerationContext ctx, IDataTarget dataTarget, OutputFileManifest manifest)
     {
-        List<DefTable> tables = dataTarget.ExportAllRecords ? ctx.Tables : ctx.ExportTables;
+        List<DefTable> tables = SelectTables(ctx, dataTarget);
         switch (dataTarget.AggregationType)
         {
             case AggregationType.Table:
@@ -43,7 +59,13 @@ public abstract class DataExporterBase : IDataExporter
             }
             case AggregationType.Tables:
             {
-                manifest.AddFile(dataTarget.ExportTables(ctx.ExportTables));
+                // 注意：此路径历史上固定用 ctx.ExportTables（不随 ExportAllRecords 切换），保持不变，仅叠加过滤
+                var allTables = ctx.ExportTables;
+                if (TableFilter != null)
+                {
+                    allTables = allTables.Where(t => !TableFilter(t)).ToList();
+                }
+                manifest.AddFile(dataTarget.ExportTables(allTables));
                 break;
             }
             case AggregationType.Record:

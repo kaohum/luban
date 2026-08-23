@@ -89,6 +89,15 @@ public class GenerationContext
     // per-language (ContentHash, Stamp) 缓存，供 checksumconfig 注入与 l10n sidecar 写入共用（GetL10NLangStamps）
     private Dictionary<string, (string ContentHash, long Stamp)> _l10nLangStamps;
 
+    // per-space per-language (ContentHash, Stamp) 缓存（GetL10NSpaceLangStamps），sidecar 与 space checksum 行共用
+    private readonly Dictionary<string, Dictionary<string, (string ContentHash, long Stamp)>> _l10nSpaceLangStamps = new();
+
+    // 配置 spaces 时的 per-space checksum 行（space 名 -> 语言行记录，TableName=语言名）。
+    // 根目录 checksumconfig 只含普通表行；各 space 的语言行由 omnibus-baseline 写到 {space.OutputDir}/checksumconfig.bytes。
+    private readonly Dictionary<string, List<Record>> _l10nSpaceChecksumRecords = new();
+
+    public IReadOnlyDictionary<string, List<Record>> L10NSpaceChecksumRecords => _l10nSpaceChecksumRecords;
+
     // dataExporter 名称（例如 default、l10n-bin-split），供模板感知当前导出模式
     public string DataExporterName { get; private set; }
 
@@ -97,6 +106,26 @@ public class GenerationContext
 
     public string L10NTextKeyFieldName { get; private set; }
     public string L10NTextKeyFieldDesc { get; private set; }
+
+    // 多 space l10n 配置(l10n.spaces);未配置时空表,走旧单值选项路径
+    public IReadOnlyList<L10N.L10NSpace> L10NSpaces { get; private set; } = Array.Empty<L10N.L10NSpace>();
+
+    // 任一 space 开启 indexMode 即视为启用 text 转 int 下标模式
+    public bool L10NTextIndexEnabled { get; private set; }
+
+    // ExportBeans 是否含 text 标签字段(递归,含父类/子类/容器);懒计算并缓存,
+    // 供各代码目标 ValidateDefinition 的共享 WARN 每目标只扫描一次
+    private bool? _hasTextTaggedExportField;
+
+    /// <summary>导出 bean(含父类/子类/容器/内嵌 bean 递归)中是否存在 text 标签的 string 字段。</summary>
+    public bool HasTextTaggedExportField
+    {
+        get
+        {
+            _hasTextTaggedExportField ??= L10N.TextFieldDetector.HasAnyTextField(ExportBeans);
+            return _hasTextTaggedExportField.Value;
+        }
+    }
 
     public bool IsL10NBinarySplitDataExporter { get; private set; }
 
@@ -155,8 +184,13 @@ public class GenerationContext
             s_logger.Info("load datas begin");
             _l10nKeyInfos = null;
             _l10nLangStamps = null;
+            _l10nSpaceLangStamps.Clear();
+            _l10nSpaceChecksumRecords.Clear();
             TextProvider?.Load();
             DataLoaderManager.Ins.LoadDatas(this);
+
+            // L10N 下标注册表构建 + text 字段 → DInt(必须在 checksum 之前,保证行哈希基于 int)
+            L10NKeyIndexBuilder.Build(this);
 
             // 为所有表计算校验和
             CalculateTableChecksums();
@@ -245,10 +279,52 @@ public class GenerationContext
     /// <summary>
     /// 读上次基准的 per-table (ContentHash, Stamp)。普通管线读 baseline/tables.json；L10N 管线读 baseline/l10n.json 的 Tables 段。
     /// 不存在/读失败 -> null（首次基准或 gate 失效，全部推进到 batchTime）。
+    /// 配置 spaces 时，space 表的 gating 状态在各 space 自己的 sidecar（普通 baseline sidecar 按 TableFilter 排除了 space 表），
+    /// 因此额外合并各 space sidecar 的 Tables 段（同文件不重读；主 sidecar 优先，space 条目不覆盖）。
+    /// 未配置 spaces 时行为与原先完全一致（只读主 sidecar 一份）。
     /// </summary>
     private Dictionary<string, (string ContentHash, long Stamp)> LoadPreviousTableStamps()
     {
         var path = EnvManager.Current.GetOptionOrDefault("", BuiltinOptionNames.IncrementalSidecarPath, true, "");
+        var result = ReadPrevTableStamps(path);
+        if (L10NSpaces.Count > 0)
+        {
+            foreach (var space in L10NSpaces)
+            {
+                if (string.IsNullOrEmpty(space.SidecarPath))
+                {
+                    continue; // 该 space 未配置 sidecar
+                }
+                if (string.Equals(space.SidecarPath, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    // 同文件：普通表 baseline sidecar 与该 space 的 L10N sidecar 互相覆盖对方的 Tables 段
+                    //（后写者胜，space sidecar 通常最后写）。症状是根 checksumconfig 里内容未变的普通表 Stamp 每轮推进
+                    //（客户端重复下载未变化的表，gating 静默失效）。仅告警不改变行为；建议两者配置不同文件。
+                    s_logger.Warn(
+                        "incremental.sidecarPath 与 space {Space} 的 l10n.{Space}.sidecar 指向同一文件 ({Path})：" +
+                        "两种 sidecar 会互相覆盖对方的 Tables 段，普通表/space 表的表级 Stamp gating 状态丢失，" +
+                        "checksumconfig 中内容未变的表戳仍会每轮推进。建议改用不同的 sidecar 文件。",
+                        space.Name, space.Name, path);
+                    continue; // 与主 sidecar 同文件（已读过），不重读
+                }
+                var spaceStamps = ReadPrevTableStamps(space.SidecarPath);
+                if (spaceStamps == null)
+                {
+                    continue;
+                }
+                result ??= new Dictionary<string, (string ContentHash, long Stamp)>();
+                foreach (var kv in spaceStamps)
+                {
+                    result.TryAdd(kv.Key, kv.Value);
+                }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>读单个 sidecar 文件的 per-table (ContentHash, Stamp)；不存在/读失败返回 null。</summary>
+    private Dictionary<string, (string ContentHash, long Stamp)> ReadPrevTableStamps(string path)
+    {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
         {
             return null;
@@ -336,12 +412,19 @@ public class GenerationContext
             }
 
             // 创建 Checksum 数据记录
-            var checksumRecords = Checksum.ChecksumTableBuilder.CreateChecksumRecords(checksumTable, Tables);
+            // 配置了 spaces：根 checksumconfig 只含普通表行（排除 space 表，无语言行）；
+            // 各 space 的 per-language 行（TableName=语言名）拆到 L10NSpaceChecksumRecords，由 omnibus-baseline
+            // 在各 space.OutputDir 下输出独立 checksumconfig.bytes。
+            IEnumerable<DefTable> checksumSourceTables = L10NSpaces.Count > 0 ? Tables.Where(t => !IsSpaceTable(t)) : Tables;
+            var checksumRecords = Checksum.ChecksumTableBuilder.CreateChecksumRecords(checksumTable, checksumSourceTables);
 
-            // L10N 管线：追加 per-language 行（TableName=语言名，Checksum=整语言文件 MD5，SignatureId 共享）
-            // 前端/服务器用现有 ChecksumConfig 类按语言名读取，做登录时 per-语言精准比对。
-            if (L10NLanguages.Count > 0)
+            if (L10NSpaces.Count > 0)
             {
+                BuildL10NSpaceChecksumRecords(checksumTable);
+            }
+            else if (L10NLanguages.Count > 0)
+            {
+                // L10N 管线（旧单值选项路径）：追加 per-language 行（TableName=语言名），行为与原先完全一致
                 AddL10NLanguageChecksumRecords(checksumTable, checksumRecords);
             }
 
@@ -429,6 +512,105 @@ public class GenerationContext
         return result;
     }
 
+    /// <summary>表是否属于任一 space 名单（space.Tables 记表全名或短名）。</summary>
+    private bool IsSpaceTable(DefTable table)
+    {
+        foreach (var space in L10NSpaces)
+        {
+            if (space.Tables.Contains(table.Name) || space.Tables.Contains(table.FullName))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 配置 spaces 时构建各 space 的 checksum 语言行（TableName=语言名，Stamp=per-language 戳，SignatureId 共享）。
+    /// 行存入 L10NSpaceChecksumRecords，根 checksumRecords 不掺语言行。
+    /// </summary>
+    private void BuildL10NSpaceChecksumRecords(DefTable checksumTable)
+    {
+        foreach (var space in L10NSpaces)
+        {
+            try
+            {
+                if (space.Languages.Count == 0)
+                {
+                    continue;
+                }
+
+                // 共享 SignatureId：space 名单内任取一张语言表（全语言共享 Language bean 结构签名）
+                string sharedSig = "";
+                foreach (var t in L10NKeyIndexBuilder.MatchTables(this, space))
+                {
+                    if (t.ValueTType is Types.TBean)
+                    {
+                        sharedSig = TypeVisitors.StructureSignature.ComputeForTable(t);
+                        break;
+                    }
+                }
+
+                var records = new List<Record>(space.Languages.Count);
+                foreach (var (lang, stampInfo) in GetL10NSpaceLangStamps(space))
+                {
+                    records.Add(Checksum.ChecksumTableBuilder.CreateChecksumRecord(checksumTable, lang, stampInfo.Stamp, sharedSig));
+                }
+                _l10nSpaceChecksumRecords[space.Name] = records;
+            }
+            catch (Exception e)
+            {
+                // 单个 space 失败不阻断根 checksum 与其它 space
+                s_logger.Error(e, "failed to build l10n checksum records for space {Space}", space.Name);
+            }
+        }
+    }
+
+    /// <summary>
+    /// space 限定版 per-language 版本戳（内容相关）：内容指纹没变 -> 沿用上次戳；变了 -> 批次时间。
+    /// indexMode space 的指纹按数组序列化（与 {outputDir}/{lang}/{outputFile}.bytes 一致）计算，
+    /// 非 indexMode space 按 string 字典序列化（与逐表 {lang}/{file}.bytes 合并布局一致）。
+    /// gating 读该 space 自己的 sidecar（space.SidecarPath）；结果缓存，供 space checksumconfig 行与
+    /// sidecar（WriteIndexSpaceSidecar / WriteLegacySpaceSidecar）共用同一份值。
+    /// </summary>
+    public Dictionary<string, (string ContentHash, long Stamp)> GetL10NSpaceLangStamps(L10N.L10NSpace space)
+    {
+        if (_l10nSpaceLangStamps.TryGetValue(space.Name, out var cached))
+        {
+            return cached;
+        }
+
+        var batchTime = GetExportStamp();
+        Incremental.L10NSidecar prev = null;
+        if (!string.IsNullOrEmpty(space.SidecarPath) && File.Exists(space.SidecarPath))
+        {
+            try
+            {
+                prev = Incremental.BaselineSidecarIO.LoadL10N(space.SidecarPath);
+            }
+            catch (Exception e)
+            {
+                s_logger.Warn(e, "failed to load previous l10n sidecar {Path} of space {Space}, per-language stamp gating disabled", space.SidecarPath, space.Name);
+                prev = null;
+            }
+        }
+
+        var contentHashes = Incremental.L10NChecksumUtil.ComputePerLanguageFileMd5(this, space);
+        var result = new Dictionary<string, (string, long)>(contentHashes.Count);
+        foreach (var (lang, hash) in contentHashes)
+        {
+            long stamp = batchTime;
+            if (prev != null && prev.Languages.TryGetValue(lang, out var prevLang)
+                && !string.IsNullOrEmpty(prevLang.ContentHash) && prevLang.ContentHash == hash && prevLang.Stamp > 0)
+            {
+                stamp = prevLang.Stamp;
+            }
+            result[lang] = (hash, stamp);
+        }
+        _l10nSpaceLangStamps[space.Name] = result;
+        return result;
+    }
+
     public GenerationContext()
     {
         Current = this;
@@ -471,6 +653,10 @@ public class GenerationContext
         L10NTextKeyFieldDesc = L10NOptionUtil.GetKeyFieldDesc();
         IsL10NBinarySplitDataExporter = string.Equals(DataExporterName, "l10n-bin-split", StringComparison.OrdinalIgnoreCase);
 
+        // 多 space 配置(l10n.spaces);未配置时空表,走旧单值选项路径
+        L10NSpaces = L10NSpaceParser.Parse(CollectL10NOptions());
+        L10NTextIndexEnabled = L10NSpaces.Any(s => s.IndexMode);
+
         // 确保导出用的表在全局范围内按表名稳定排序，便于模板等场景使用（例如 __tables）
         if (Assembly.ExportTables == null)
         {
@@ -498,48 +684,83 @@ public class GenerationContext
         }
     }
 
-    public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos()
+    /// <summary>
+    /// 从 EnvManager 收集 l10n 前缀的选项为扁平字典,供 L10NSpaceParser 解析。
+    /// EnvManager 的选项本身就是按完整 key("-x l10n.main.tables=x" -> "l10n.main.tables")存放的扁平字典,
+    /// 因此 family 传空串、name 传完整 key 即可精确命中(与 L10NOptionUtil 的 "l10n"+".key 拼接等价)。
+    /// </summary>
+    private Dictionary<string, string> CollectL10NOptions()
+    {
+        var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+        var env = EnvManager.Current;
+        string Probe(string key)
+        {
+            var v = env.GetOptionOrDefault("", key, true, "");
+            return v ?? "";
+        }
+        dict["l10n.spaces"] = Probe("l10n.spaces");
+        foreach (var name in Probe("l10n.spaces").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            foreach (var k in new[] { "tables", "indexMode", "languages", "outputFile", "outputDir", "keyFieldName", "keyFieldDesc", "nameFieldName", "genAccessors", "sidecar" })
+            {
+                dict[$"l10n.{name}.{k}"] = Probe($"l10n.{name}.{k}");
+            }
+        }
+        return dict;
+    }
+
+    public IReadOnlyList<L10NKeyInfo> GetL10NKeyInfos()
     {
         if (_l10nKeyInfos != null)
         {
-            return (_l10nKeyInfos, typeof(int));
+            return _l10nKeyInfos;
         }
 
-        var (keys, keyType) = EnumerateL10NKeys(ExportTables);
-        _l10nKeyInfos = keys;
-        return (_l10nKeyInfos, keyType);
+        _l10nKeyInfos = EnumerateL10NKeys(ExportTables);
+        return _l10nKeyInfos;
     }
 
     /// <summary>
     /// 仅枚举指定表集合的 l10n key（不写缓存）。
     /// 用于代码生成时只从“代码引用语言表”取 key，而非全部语言表。
     /// flagFieldName 非空时，进一步按行内 bool 标记字段过滤：仅该字段为 true 的行入选。
+    /// languages/keyFieldName/keyFieldDesc/nameFieldName 用于 space 感知的调用方（如 cs-l10n-language 多 space 生成）
+    /// 按 space 自己的语言名单与 key/desc/name 字段枚举；传 null 时沿用全局选项（旧调用方行为不变）。
     /// </summary>
-    public (IReadOnlyList<L10NKeyInfo>, System.Type) GetL10NKeyInfos(IReadOnlyList<DefTable> tables, string flagFieldName = null)
+    public IReadOnlyList<L10NKeyInfo> GetL10NKeyInfos(IReadOnlyList<DefTable> tables, string flagFieldName = null,
+        IReadOnlyList<string> languages = null, string keyFieldName = null, string keyFieldDesc = null, string nameFieldName = null)
     {
-        if (!DatasLoaded || L10NLanguages.Count == 0)
+        var langList = languages ?? L10NLanguages;
+        if (!DatasLoaded || langList.Count == 0)
         {
-            return (Array.Empty<L10NKeyInfo>(), typeof(int));
+            return Array.Empty<L10NKeyInfo>();
         }
-        return EnumerateL10NKeys(tables, flagFieldName);
+        return EnumerateL10NKeys(tables, flagFieldName, langList, keyFieldName, keyFieldDesc, nameFieldName);
     }
 
-    private (List<L10NKeyInfo>, System.Type) EnumerateL10NKeys(IReadOnlyList<DefTable> tables, string flagFieldName = null)
+    /// <summary>
+    /// v2（spec 2026-08-22 D7）：key 字段（id 列，int）→ <see cref="L10NKeyInfo.Id"/>（烘进 Get(id)）；
+    /// name 列（string，可选）→ 访问器名 <see cref="L10NKeyInfo.FieldName"/>，语言表无该列时退化为 id/key 派生；
+    /// desc 字段 → XML 注释内容。旧行为里 id 为 string key（未配 spaces 的单值路径）时 Id 导出 -1（过渡形态）。
+    /// </summary>
+    private List<L10NKeyInfo> EnumerateL10NKeys(IReadOnlyList<DefTable> tables, string flagFieldName = null,
+        IReadOnlyList<string> languages = null, string keyFieldName = null, string keyFieldDesc = null, string nameFieldName = null)
     {
-        if (!DatasLoaded || L10NLanguages.Count == 0)
+        var langList = languages ?? L10NLanguages;
+        if (!DatasLoaded || langList.Count == 0)
         {
-            return (new List<L10NKeyInfo>(), typeof(int));
+            return new List<L10NKeyInfo>();
         }
 
         bool hasFlagFilter = !string.IsNullOrWhiteSpace(flagFieldName);
         int flagFieldMatchedTables = 0;
 
-        var keyFieldName = L10NTextKeyFieldName;
-        var keyFieldDesc = L10NTextKeyFieldDesc;
-        var langSet = new HashSet<string>(L10NLanguages, StringComparer.Ordinal);
-        var keys = new List<(object, string)>();
+        var keyFieldNameResolved = string.IsNullOrWhiteSpace(keyFieldName) ? L10NTextKeyFieldName : keyFieldName;
+        var keyFieldDescResolved = string.IsNullOrWhiteSpace(keyFieldDesc) ? L10NTextKeyFieldDesc : keyFieldDesc;
+        var nameFieldNameResolved = string.IsNullOrWhiteSpace(nameFieldName) ? "name" : nameFieldName;
+        var langSet = new HashSet<string>(langList, StringComparer.Ordinal);
+        var keys = new List<(object, string, string)>();
         var keySet = new HashSet<object>();
-        System.Type keyType = null;
 
         foreach (var table in tables)
         {
@@ -575,7 +796,8 @@ public class GenerationContext
                 continue;
             }
 
-            var hasDesc = HasStringField(bean, keyFieldDesc);
+            var hasDesc = HasStringField(bean, keyFieldDescResolved);
+            var hasName = HasStringField(bean, nameFieldNameResolved);
 
             foreach (var record in tableDataInfo.FinalRecords)
             {
@@ -587,8 +809,11 @@ public class GenerationContext
                 {
                     continue;
                 }
-                var keyValue = data.GetField(keyFieldName);
-                if (keyType == null) keyType = keyValue.GetValueObject().GetType();
+                var keyValue = data.GetField(keyFieldNameResolved);
+                if (keyValue == null)
+                {
+                    continue;
+                }
                 if (keyValue is DString stringValue)
                 {
                     if (string.IsNullOrEmpty(stringValue.Value))
@@ -599,16 +824,24 @@ public class GenerationContext
 
                 if (keySet.Add(keyValue.GetValueObject()))
                 {
+                    var nameContent = string.Empty;
+                    if (hasName)
+                    {
+                        if (data.GetField(nameFieldNameResolved) is DString nameValue && !string.IsNullOrWhiteSpace(nameValue.Value))
+                        {
+                            nameContent = nameValue.Value;
+                        }
+                    }
                     var descContent = string.Empty;
                     if (hasDesc)
                     {
-                        var descValue = data.GetField(keyFieldDesc) as DString;
+                        var descValue = data.GetField(keyFieldDescResolved) as DString;
                         if (descValue != null && !string.IsNullOrEmpty(descValue.Value))
                         {
                             descContent = descValue.Value;
                         }
                     }
-                    keys.Add((keyValue.GetValueObject(), descContent));
+                    keys.Add((keyValue.GetValueObject(), nameContent, descContent));
                 }
             }
         }
@@ -621,8 +854,7 @@ public class GenerationContext
                 $"请检查 language schema 中 Language bean 是否包含该 bool 字段。当前表集合：{available}");
         }
 
-        //keys.Sort((v1, v2) => String.Compare(v1.Item1, v2.Item1, StringComparison.Ordinal));
-        return (BuildL10NKeyInfos(keys), keyType);
+        return BuildL10NKeyInfos(keys);
     }
 
     private void AddChildrenByOrder(List<DefBean> list, DefBean bean)
@@ -676,13 +908,15 @@ public class GenerationContext
         return false;
     }
 
-    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<(object, string)> keys)
+    private static List<L10NKeyInfo> BuildL10NKeyInfos(IEnumerable<(object Key, string Name, string Desc)> keys)
     {
         var result = new List<L10NKeyInfo>();
         var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var key in keys)
         {
-            string fieldName = MakeIdentifier(key.Item1);
+            // 访问器名优先取 name 列（v2 D7）；无 name 列的空间（如 server）退化为 id/key 派生标识符
+            string identifierSource = string.IsNullOrWhiteSpace(key.Name) ? key.Key.ToString() : key.Name;
+            string fieldName = MakeIdentifier(identifierSource);
             if (nameCount.TryGetValue(fieldName, out int count))
             {
                 count++;
@@ -693,10 +927,24 @@ public class GenerationContext
             {
                 nameCount[fieldName] = 1;
             }
-            s_logger.Debug("keys add {}, {}, {}", key.Item1, fieldName, key.Item2);    
-            result.Add(new L10NKeyInfo(key.Item1, fieldName, key.Item2));
+            s_logger.Debug("keys add id:{}, name:{}, field:{}, desc:{}", ToL10NKeyId(key.Key), key.Name, fieldName, key.Desc);
+            result.Add(new L10NKeyInfo(ToL10NKeyId(key.Key),
+                string.IsNullOrWhiteSpace(key.Name) ? null : key.Name, fieldName, key.Desc));
         }
         return result;
+    }
+
+    /// <summary>key 值（id 列）→ 烘焙用 int id：int 直接取，其余整数形态收窄为 int，非整数（旧 string key）返回 -1。</summary>
+    private static int ToL10NKeyId(object key)
+    {
+        return key switch
+        {
+            int i => i,
+            long l => unchecked((int)l),
+            short s => s,
+            byte b => b,
+            _ => -1,
+        };
     }
 
     private static string MakeIdentifier(object key)

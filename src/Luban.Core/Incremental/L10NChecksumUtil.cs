@@ -39,10 +39,11 @@ namespace Luban.Incremental;
 public static class L10NChecksumUtil
 {
     /// <summary>
-    /// 合并所有语言表 -> perLang[lang] = key -> value（镜像 ExportL10NMergedPerLanguage 的合并语义）。
+    /// 合并语言表 -> perLang[lang] = key -> value（镜像 ExportL10NMergedPerLanguage 的合并语义）。
+    /// tables = null（默认）遍历全部表（旧行为）；传入则只合并名单内的表（space 限定版）。
     /// </summary>
     public static Dictionary<string, Dictionary<object, string>> BuildPerLanguageMap(
-        GenerationContext ctx, IReadOnlyList<string> languages, string keyFieldName)
+        GenerationContext ctx, IReadOnlyList<string> languages, string keyFieldName, IEnumerable<DefTable> tables = null)
     {
         var perLang = new Dictionary<string, Dictionary<object, string>>();
         foreach (var lang in languages)
@@ -50,7 +51,7 @@ public static class L10NChecksumUtil
             perLang[lang] = new Dictionary<object, string>();
         }
 
-        foreach (var table in ctx.Tables)
+        foreach (var table in tables ?? ctx.Tables)
         {
             if (table.ValueTType is not TBean tbean)
             {
@@ -94,10 +95,11 @@ public static class L10NChecksumUtil
 
     /// <summary>
     /// 取第一张 L10N 表的 key 类型（全语言共享，用于序列化对齐）。
+    /// tables = null（默认）遍历全部表（旧行为）；传入则只在名单内找（space 限定版）。
     /// </summary>
-    public static TType FindLanguageKeyType(GenerationContext ctx, string keyFieldName)
+    public static TType FindLanguageKeyType(GenerationContext ctx, string keyFieldName, IEnumerable<DefTable> tables = null)
     {
-        foreach (var table in ctx.Tables)
+        foreach (var table in tables ?? ctx.Tables)
         {
             if (table.ValueTType is not TBean tbean)
             {
@@ -130,8 +132,33 @@ public static class L10NChecksumUtil
     }
 
     /// <summary>
+    /// space 限定版：计算 space 每种语言的整语言文件 MD5。
+    /// v2（spec 2026-08-22）：main/aot/server 三类 space 统一走 int 字典序列化
+    /// （[WriteSize: count] [WriteKey(id) WriteString(value)]*，与 {outputDir} 下各语言 bin 布局一致——
+    /// indexMode space 为合并单文件 {lang}/{outputFile}.bytes，非 indexMode space 为逐表 {lang}/{table}.bytes，
+    /// 序列化布局相同）。数组序列化（SerializeLanguageArray）已随 v2 退役删除。
+    /// space.Tables == null 表示"全部表"（omnibus 旧路径合成 space 专用），与旧全局行为等价。
+    /// </summary>
+    public static Dictionary<string, string> ComputePerLanguageFileMd5(GenerationContext ctx, L10N.L10NSpace space)
+    {
+        IEnumerable<DefTable> tables = space.Tables == null
+            ? null
+            : L10N.L10NKeyIndexBuilder.MatchTables(ctx, space);
+        var perLang = BuildPerLanguageMap(ctx, space.Languages, space.KeyFieldName, tables);
+
+        var keyType = FindLanguageKeyType(ctx, space.KeyFieldName, tables);
+        var result = new Dictionary<string, string>(perLang.Count);
+        foreach (var (lang, map) in perLang)
+        {
+            result[lang] = FileUtil.CalcMD5(SerializeLanguageBytes(map, keyType));
+        }
+        return result;
+    }
+
+    /// <summary>
     /// 把 per-语言 (key -> value) 序列化为与 languageconfig.bytes 逐条一致的字节：
     /// [WriteSize: count] [WriteKey(key) WriteString(value)]*
+    /// v2 语言 key 为显式 int（keyType=TInt），即 int 键紧凑字典格式（server space 同款，spec D3）。
     /// </summary>
     public static byte[] SerializeLanguageBytes(Dictionary<object, string> map, TType keyType)
     {
@@ -143,6 +170,22 @@ public static class L10NChecksumUtil
             buf.WriteString(kv.Value ?? string.Empty);
         }
         return buf.CopyData();
+    }
+
+    /// <summary>
+    /// 装箱 key（BuildPerLanguageMap 的 Dictionary&lt;object,string&gt;）→ int 语言 id。
+    /// v2 语言表 key 字段必为 int 家族；string key 属 v1 残留，显式报错。
+    /// </summary>
+    public static int ToIntId(object key)
+    {
+        return key switch
+        {
+            int i => i,
+            long l => (int)l,
+            short s => s,
+            byte b => b,
+            _ => throw new NotSupportedException($"[l10n] v2 语言 key 必须是 int（显式语言 id），遇到 {key?.GetType().Name}: {key}"),
+        };
     }
 
     private static void WriteKey(ByteBuf buf, object key, TType type)
