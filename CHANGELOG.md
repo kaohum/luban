@@ -2,6 +2,15 @@
 
 ### 2026-08-24
 
+- **L10N 增量导出基线冻结：移除 sidecar KeyEntries 回写与墓碑机制（增量 run 对基线完全只读）**
+  - 动机：确认增量语义为「基线一旦生成即冻结；每次增量 = 当前数据对冻结基线快照的完整重算，补丁为相对基线的累计 diff（补丁 C 相对基线 A 而非补丁 B）；客户端从 0 重放 = 基线 + 最新补丁」。此前 `IncrementalL10NDataExporter.HandleSpace` 末尾把 id 注册表（KeyEntries）回写进 `l10n.json` / `l10n.aot.json`，违反基线冻结（增量 run 改写基线文件，且 KeyEntries 随删除历史无界增长）。
+  - 行为变化：增量 run 对 L10N sidecar **完全只读**（普通表 tables.json 本就只读）；sidecar 仅由基准导出写入，格式退化为纯快照（SignatureId/Keys/Languages/Tables，移除 KeyEntries/KeyEntry 字段与墓碑）。`LoadPrevIds`/`BuildRegistry(current,prev)` 墓碑链全链路退役——审计确认其三个消费点在冻结基线语义下与「当前不存在」恒等价、对 diff 输出零影响。
+  - diff 语义（不变）：delete 仅覆盖基线快照内的 id（基线后新增又删掉的 id 无需删除补丁——从 0 重放的客户端本来就没有它）；upsert 覆盖 hash 变化 + 基线后新增的活 id。
+  - 向后兼容：旧 sidecar 的 KeyEntries 字段被反序列化器自然忽略，旧文件可直接继续用于增量 diff；格式变化仅影响下次基准导出重写的 l10n.json / l10n.aot.json（不再含 KeyEntries）。sidecar 不下发，客户端/服务器运行时零改动。
+  - 验证：slg 工程用新 DLL 跑客户端增量导表，基线四份 JSON 逐字节不变（md5 一致、mtime 未动）；zh_CN LLP2 补丁完整对齐（65/65 字节），upserts 恰好命中工作区两处语言表改动（10086 改值 + 20638 新增行），deletes 为空。
+  - 测试：Luban.Tests 62 -> 58（删除 4 项 LoadPrevIds 墓碑用例、KeyEntries 往返用例改 Keys/Languages 往返、墓碑并集用例改注册表=活 id 集），全绿。
+  - 修改文件：`src/Luban.Core/Incremental/SidecarModels.cs`、`src/Luban.Core/L10N/L10NKeyIndex.cs`、`src/Luban.Core/L10N/L10NKeyIndexBuilder.cs`、`src/Luban.DataTarget.Builtin/Incremental/IncrementalL10NDataExporter.cs`、`src/Luban.DataTarget.Builtin/Incremental/L10NBaselineWithSidecarExporter.cs`、`src/Luban.Tests/BaselineSidecarIOTests.cs`、`src/Luban.Tests/L10NKeyIndexBuilderTests.cs`、`docs/superpowers/specs/2026-08-22-l10n-explicit-int-id-design.md`。
+
 - **`l10n.silentMissingWarn`：服务器等重复导出调用静默 `[lan-index]` 缺失告警与 CSV 报告**
   - 动机：客户端 omnibus 导出（`-t client` 调用）是 `[lan-index]` 缺失/空 WARN 与 `missing_language_ids.csv` 报告的权威来源；server 导出调用（`-t server -d json`）会重复输出同一批 WARN 并重写同一份 CSV（内容幂等，但属噪音）。新增全局布尔选项 `l10n.silentMissingWarn`（默认 false = 现状）。
   - 行为（true 时）：text 字段仍正常静态校验、非法/空格仍导出哨兵 -1、非法格仍逐格收集条目（数据与报告内容零影响），但跳过逐格 `[lan-index][missing-id]` 与空单元格 WARN、跳过 `[lan-index][missing-id-summary]` 汇总告警、不写 `l10n.missingIdsReport` CSV（由客户端调用独占写入，文件保持原状）。

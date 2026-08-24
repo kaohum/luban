@@ -21,44 +21,34 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Luban.Incremental;
 
 namespace Luban.L10N;
 
 /// <summary>
-/// v2 显式 int 语言 id 注册表:
-/// - <see cref="LiveIds"/> = 语言表 id 列的活 id 集,是 text 单元格静态校验(id∈集)的唯一依据;
-/// - <see cref="Entries"/> = 活 id ∪ sidecar 墓碑差集(表内 id 优先于墓碑,即复活),供增量 sidecar 回写。
-/// v2 中 id 即键:KeyEntry.Id 即语言表显式 id,条目位置无下标语义。
+/// v2 显式 int 语言 id 注册表：
+/// - <see cref="LiveIds"/> = 语言表 id 列的活 id 集，是 text 单元格静态校验(id∈集)的唯一依据。
+/// 无墓碑：增量 diff 以冻结的基线 sidecar 快照为基准（基准后新增又删掉的 id 无需删除补丁，
+/// 客户端从 0 重放 = 基线 + 最新补丁，本来就没有它）。id 即键，无位置下标语义。
 /// </summary>
 public class L10NKeyIndex
 {
     public HashSet<int> LiveIds { get; }
 
-    public List<KeyEntry> Entries { get; }
+    public int Count => LiveIds.Count;
 
-    public int Count => Entries.Count;
-
-    public L10NKeyIndex(HashSet<int> liveIds, IEnumerable<int> tombstoneIds)
+    public L10NKeyIndex(HashSet<int> liveIds)
     {
         LiveIds = liveIds;
-        var tombstones = new HashSet<int>(tombstoneIds);
-        tombstones.ExceptWith(liveIds); // 表内 id 复活优先:同 id 不再视为墓碑
-        Entries = new List<KeyEntry>(liveIds.Count + tombstones.Count);
-        foreach (var id in liveIds.Concat(tombstones).OrderBy(i => i))
-        {
-            Entries.Add(new KeyEntry { Id = id, Deleted = !liveIds.Contains(id) });
-        }
     }
 
-    /// <summary>id 是否为活 id(语言表内存在);墓碑/未注册返回 false。</summary>
+    /// <summary>id 是否为活 id（语言表内存在）；未注册返回 false。</summary>
     public bool Contains(int id)
     {
         return LiveIds.Contains(id);
     }
 
     /// <summary>
-    /// v2:id 即下标。字符串按 int 解析,活 id 返回其自身;墓碑、非 int(旧 string key)或未注册返回 false。
+    /// v2：id 即下标。字符串按 int 解析，活 id 返回其自身；非 int（旧 string key）或未注册返回 false。
     /// </summary>
     public bool TryGetIndex(string key, out int index)
     {

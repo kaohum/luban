@@ -23,7 +23,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Luban.Datas;
 using Luban.Defs;
-using Luban.Incremental;
 using Luban.Types;
 using Luban.Utils;
 
@@ -33,7 +32,7 @@ namespace Luban.L10N
     /// LoadDatas 末尾:为每个 indexMode space 构建显式 int 语言 id 注册表,并把业务表 text 字段(int 字面量)改写为 DInt(id)。
     /// 必须在 CalculateTableChecksums 之前执行(checksum 直接基于 int 数据,id 在表内,天然稳定幂等)。
     /// v2(spec 2026-08-22):语言 id 为策划显式填写的 int,不再导表期自动分配下标(KeyIndexAllocator 已退役);
-    /// 注册表 = 语言表 id 列(活 id 集)∪ sidecar 墓碑差集(墓碑仅供增量 diff,不参与 text 校验)。
+    /// 注册表 = 语言表 id 列活 id 集(无墓碑:基线冻结语义下增量以基准快照为基准,见 IncrementalL10NDataExporter)。
     /// 静态检查:语言表重复 id=硬错误;id 跨段(对照 spec §2 段表)=仅告警。
     /// </summary>
     public static class L10NKeyIndexBuilder
@@ -70,7 +69,7 @@ namespace Luban.L10N
             foreach (var space in ctx.L10NSpaces.Where(s => s.IndexMode))
             {
                 var currentIds = CollectCurrentIds(ctx, space); // 重复 id 硬错误;跨段/段外 id 仅告警
-                space.KeyIndex = BuildRegistry(currentIds, LoadPrevIds(space.SidecarPath));
+                space.KeyIndex = new L10NKeyIndex(currentIds);
             }
             if (!ctx.L10NTextIndexEnabled)
             {
@@ -147,46 +146,6 @@ namespace Luban.L10N
                 }
             }
             return ids;
-        }
-
-        /// <summary>
-        /// 注册表 = 表内活 id ∪ sidecar 墓碑差集(prev - current);表内 id 优先(复活)。
-        /// 幂等:id 在表内,同一 (current, prev) 输入恒定产出同一注册表。
-        /// </summary>
-        public static L10NKeyIndex BuildRegistry(HashSet<int> currentIds, IEnumerable<int> prevIds)
-        {
-            return new L10NKeyIndex(currentIds, prevIds ?? Array.Empty<int>());
-        }
-
-        /// <summary>
-        /// 读上次 sidecar 记录过的 id 集(活+墓碑一并视作"曾出现",v2 KeyEntry.Id 直接为 int;
-        /// Id<=0 的条目是 v1 string 格式残留反序列化出的垃圾值,忽略)。文件不存在/读取失败返回空集
-        /// (等价于首次基准);v1 string-key sidecar 在 BaselineSidecarIO.LoadL10N 处整体视为空。
-        /// </summary>
-        public static HashSet<int> LoadPrevIds(string sidecarPath)
-        {
-            if (string.IsNullOrEmpty(sidecarPath) || !File.Exists(sidecarPath))
-            {
-                return new HashSet<int>();
-            }
-            try
-            {
-                var sidecar = BaselineSidecarIO.LoadL10N(sidecarPath);
-                var result = new HashSet<int>();
-                foreach (var e in sidecar?.KeyEntries ?? (IReadOnlyList<KeyEntry>)Array.Empty<KeyEntry>())
-                {
-                    if (e.Id > 0)
-                    {
-                        result.Add(e.Id);
-                    }
-                }
-                return result;
-            }
-            catch (Exception e)
-            {
-                s_logger.Warn(e, "failed to load l10n sidecar key entries from {Path}, treating as empty registry (no tombstones)", sidecarPath);
-                return new HashSet<int>();
-            }
         }
 
         /// <summary>id 所属段:万级分段 id/10000*10000;&lt;10000 不属于任何段;十万级扩展区(含 AOT)整区同段。</summary>

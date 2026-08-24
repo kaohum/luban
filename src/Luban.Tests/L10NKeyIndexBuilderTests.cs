@@ -19,16 +19,14 @@
 // SOFTWARE.
 
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using Luban.Incremental;
 using Luban.L10N;
 using Xunit;
 
 namespace Luban.Tests
 {
     // v2:KeyIndexAllocator(自动分配下标)已退役;本测试覆盖其替代者 L10NKeyIndexBuilder 的
-    // 纯函数接缝:id 集合并集(表内 id ∪ sidecar 墓碑差集)、重复 id 硬错误、段表计算。
+    // 纯函数接缝:活 id 集(注册表=语言表 id 列,无墓碑)、重复 id 硬错误、段表计算。
     public class L10NKeyIndexBuilderTests
     {
         [Fact]
@@ -46,93 +44,25 @@ namespace Luban.Tests
         }
 
         [Fact]
-        public void 墓碑并集_表内id加sidecar差集()
+        public void 注册表_等于当前活id集_无墓碑()
         {
             var currentIds = new HashSet<int> { 10002, 10001 };
-            var prev = new[] { 10002, 10099 }; // 10099 已从语言表删除 → 墓碑;10002 复活为活 id
-            var registry = L10NKeyIndexBuilder.BuildRegistry(currentIds, prev);
+            var registry = new L10NKeyIndex(currentIds);
 
             Assert.Equal(new[] { 10001, 10002 }, registry.LiveIds.OrderBy(i => i));
-            // Entries = 活 + 墓碑,按 id 升序;v2 KeyEntry.Id 即显式 int 语言 id
-            Assert.Equal(new[] { 10001, 10002, 10099 }, registry.Entries.Select(e => e.Id));
-            Assert.False(registry.Entries[0].Deleted);
-            Assert.False(registry.Entries[1].Deleted);
-            Assert.True(registry.Entries[2].Deleted);
-
+            Assert.Equal(2, registry.Count);
             Assert.True(registry.Contains(10001));
-            Assert.False(registry.Contains(10099)); // 墓碑不是活 id,不能通过 text 单元格静态校验
+            Assert.False(registry.Contains(10099)); // 未注册 id 不是活 id,不能通过 text 单元格静态校验
         }
 
         [Fact]
         public void TryGetIndex_id即键()
         {
-            var registry = L10NKeyIndexBuilder.BuildRegistry(
-                new HashSet<int> { 10034 }, new[] { 10099 });
+            var registry = new L10NKeyIndex(new HashSet<int> { 10034 });
             Assert.True(registry.TryGetIndex("10034", out var idx));
             Assert.Equal(10034, idx); // v2:id 即下标,不再是注册表位置
-            Assert.False(registry.TryGetIndex("10099", out _)); // 墓碑
+            Assert.False(registry.TryGetIndex("10099", out _)); // 未注册
             Assert.False(registry.TryGetIndex("old_key", out _)); // 非 int(旧 string key)
-        }
-
-        [Fact]
-        public void LoadPrevIds_读int注册表_活与墓碑一并收录()
-        {
-            string path = Path.Combine(Path.GetTempPath(), $"l10n_prev_{System.Guid.NewGuid():N}.json");
-            try
-            {
-                var s = new L10NSidecar { SignatureId = "sig" };
-                s.KeyEntries.Add(new KeyEntry { Id = 10001 });
-                s.KeyEntries.Add(new KeyEntry { Id = 20005, Deleted = true });
-                BaselineSidecarIO.SaveL10N(path, s);
-
-                var prev = L10NKeyIndexBuilder.LoadPrevIds(path);
-                Assert.Equal(new[] { 10001, 20005 }, prev.OrderBy(i => i));
-            }
-            finally
-            {
-                File.Delete(path);
-            }
-        }
-
-        [Fact]
-        public void LoadPrevIds_v1字符串key条目_垃圾Id零被忽略()
-        {
-            // v1 混合条目反序列化:{"Key":"legacy_str_key"} 无 Id 属性 → Id=0(v1 残留垃圾值)→ 忽略
-            string path = Path.Combine(Path.GetTempPath(), $"l10n_prev_{System.Guid.NewGuid():N}.json");
-            try
-            {
-                File.WriteAllText(path,
-                    @"{""SignatureId"":""sig"",""Keys"":[],""KeyEntries"":[{""Key"":""legacy_str_key""},{""Id"":10001}]}");
-                var prev = L10NKeyIndexBuilder.LoadPrevIds(path);
-                Assert.Equal(new[] { 10001 }, prev);
-            }
-            finally
-            {
-                File.Delete(path);
-            }
-        }
-
-        [Fact]
-        public void LoadPrevIds_v1字符串Keys的sidecar_整体视为空()
-        {
-            // v1 string Keys 在 v2 int 模型下反序列化失败 → LoadL10N 返回空 sidecar → 无墓碑
-            string path = Path.Combine(Path.GetTempPath(), $"l10n_prev_{System.Guid.NewGuid():N}.json");
-            try
-            {
-                File.WriteAllText(path,
-                    @"{""SignatureId"":""sig"",""Keys"":[""btn_ok""],""KeyEntries"":[{""Key"":""btn_ok""}]}");
-                Assert.Empty(L10NKeyIndexBuilder.LoadPrevIds(path));
-            }
-            finally
-            {
-                File.Delete(path);
-            }
-        }
-
-        [Fact]
-        public void LoadPrevIds_文件不存在_返回空()
-        {
-            Assert.Empty(L10NKeyIndexBuilder.LoadPrevIds("Z:/not/exist/l10n.json"));
         }
 
         [Fact]

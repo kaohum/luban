@@ -191,15 +191,13 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
     }
 
     /// <summary>
-    /// indexMode space 的 sidecar v2（int id 语义）：
-    /// - KeyEntries = 本次 id 注册表（回写，含墓碑；基准 run 与增量 run 都会回写，幂等关键）；
-    /// - Keys = 基准时刻活 id 的紧凑快照（升序，墓碑不进快照——增量侧按 id 直接比对，
-    ///   见 IncrementalL10NDataExporter.HandleSpace）；
+    /// indexMode space 的 sidecar v2（int id 语义，基线冻结，仅基准导出写入）：
+    /// - Keys = 基准时刻活 id 的升序快照，增量侧按 id 直接比对（见 IncrementalL10NDataExporter.HandleSpace）；
     /// - Languages[lang].Hashes = 与 Keys 对齐的 MD5（缺失 = 空串）；
     ///   (ContentHash, Stamp) 取 ctx.GetL10NSpaceLangStamps(space)（ContentHash = int 字典序列化
     ///   （与导出的 {lang}/{outputFile}.bytes 布局一致）整文件 MD5，Stamp 沿用 gating 语义），
     ///   与该 space 的 checksumconfig 语言行共用同一份计算。
-    /// 增量 run 只回写 KeyEntries（不动 Keys/Languages），因此 Keys/Languages 始终是最近一次基准的快照。
+    /// 增量 run 只读本文件（见 IncrementalL10NDataExporter），Keys/Languages 始终是最近一次基准的快照。
     /// </summary>
     internal static void WriteIndexSpaceSidecar(GenerationContext ctx, L10NSpace space)
     {
@@ -230,21 +228,12 @@ public class L10NBaselineWithSidecarExporter : L10NBinarySplitDataExporter
         // space 名单表合并 -> perLang[lang] = id -> value
         var perLang = L10NChecksumUtil.BuildPerLanguageMap(ctx, space.Languages, space.KeyFieldName, tables);
 
-        // 基准快照 Keys：注册表活 id 紧凑快照（升序）；KeyEntries = 注册表全量（含墓碑）回写
-        var entries = space.KeyIndex.Entries;
-        var keys = new List<int>(entries.Count);
-        foreach (var e in entries)
-        {
-            if (!e.Deleted)
-            {
-                keys.Add(e.Id);
-            }
-        }
+        // 基准快照 Keys：当前活 id 升序（注册表 = 活 id 集，无墓碑；基线冻结，本文件仅基准导出写入）
+        var keys = space.KeyIndex.LiveIds.OrderBy(id => id).ToList();
         var sidecar = new L10NSidecar
         {
             SignatureId = sigId,
             Keys = keys,
-            KeyEntries = entries,
         };
 
         // per-language (ContentHash, Stamp)：共享 ctx 缓存（gating 在 LoadDatas 阶段对该 space 的上次 sidecar 完成），

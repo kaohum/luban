@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Collections.Generic;
 using System.IO;
 using Luban.Incremental;
 using Xunit;
@@ -27,26 +28,25 @@ namespace Luban.Tests
     public class BaselineSidecarIOTests
     {
         [Fact]
-        public void KeyEntries_序列化往返_保序保墓碑()
+        public void L10NSidecar_序列化往返_保Keys与Languages()
         {
             string path = Path.Combine(Path.GetTempPath(), $"l10n_test_{System.Guid.NewGuid():N}.json");
             try
             {
-                var s = new L10NSidecar { SignatureId = "sig1" };
-                s.KeyEntries.Add(new KeyEntry { Id = 10001 });
-                s.KeyEntries.Add(new KeyEntry { Id = 10002, Deleted = true });
+                var s = new L10NSidecar { SignatureId = "sig1", Keys = new List<int> { 10001, 10002 } };
+                s.Languages["zh_CN"] = new LangSidecar
+                {
+                    Hashes = new List<string> { "h1", "h2" },
+                    ContentHash = "c1",
+                    Stamp = 123,
+                };
                 BaselineSidecarIO.SaveL10N(path, s);
 
-                // 墓碑判定依赖默认值,必须确保序列化选项不会忽略 Deleted=false(如 WhenWritingDefault)
-                string raw = File.ReadAllText(path);
-                Assert.Contains("\"Deleted\"", raw);
-
                 var loaded = BaselineSidecarIO.LoadL10N(path);
-                Assert.Equal(2, loaded.KeyEntries.Count);
-                Assert.Equal(10001, loaded.KeyEntries[0].Id);
-                Assert.False(loaded.KeyEntries[0].Deleted);
-                Assert.Equal(10002, loaded.KeyEntries[1].Id);
-                Assert.True(loaded.KeyEntries[1].Deleted);
+                Assert.Equal("sig1", loaded.SignatureId);
+                Assert.Equal(new[] { 10001, 10002 }, loaded.Keys);
+                Assert.Equal(new[] { "h1", "h2" }, loaded.Languages["zh_CN"].Hashes);
+                Assert.Equal(123, loaded.Languages["zh_CN"].Stamp);
             }
             finally
             {
@@ -55,7 +55,7 @@ namespace Luban.Tests
         }
 
         [Fact]
-        public void 旧格式sidecar_无KeyEntries_读入为空且不报错()
+        public void 无Keys无Languages的sidecar_读入为空且不报错()
         {
             string path = Path.Combine(Path.GetTempPath(), $"l10n_old_{System.Guid.NewGuid():N}.json");
             try
@@ -63,7 +63,8 @@ namespace Luban.Tests
                 File.WriteAllText(path, @"{""SignatureId"":""s"",""Keys"":[],""Languages"":{}}");
                 var loaded = BaselineSidecarIO.LoadL10N(path);
                 Assert.NotNull(loaded);
-                Assert.Empty(loaded.KeyEntries);
+                Assert.Empty(loaded.Keys);
+                Assert.Empty(loaded.Languages);
             }
             finally
             {
@@ -85,7 +86,6 @@ namespace Luban.Tests
                 Assert.NotNull(loaded);
                 Assert.Equal("", loaded.SignatureId); // 整体视为空(结构 gate 将要求重基准)
                 Assert.Empty(loaded.Keys);
-                Assert.Empty(loaded.KeyEntries);
                 Assert.Empty(loaded.Languages);
             }
             finally

@@ -18,7 +18,7 @@ v2 策略(用户拍板):**语言 id 改为显式 int,与 server 表同模式**(s
 | # | 决策 | 内容 |
 |---|---|---|
 | D1 | 语言 id 形态 | 显式 int,策划直接填;**不再自动分配**(id 在表内,天然稳定幂等) |
-| D2 | id 段分类 | 万级分段(见 §2),段内连续分配,id 永不复用(删行=墓碑) |
+| D2 | id 段分类 | 万级分段(见 §2),段内连续分配,id 永不复用(删行后不再分配该 id) |
 | D3 | 存储格式 | **int 键紧凑字典**(禁止稀疏数组):bin=`{count}{(varint id,string value)}*`(即 server space 现行格式);运行时=**`PooledHashMap<int,string>`**(客户端 `Assets/Plugins/Collections/`) |
 | D4 | 配置表引用列 | **沿用 `text` 类型**(不新造关键字);单元格填 int id(字符串形式);**导表阶段静态检查**(id∈语言表;空=-1;缺失=告警+-1 并收集清单,不阻塞、不改语言表——沿用 R12 语义) |
 | D5 | 字段命名规范 | 语言引用字段统一 `*Id`(name→nameId、desc→descId、text→textId、title→titleId、heroName→heroNameId…);已带 Id 的不动;CSV 表头+生成代码+客户端调用点联动 |
@@ -43,7 +43,7 @@ v2 策略(用户拍板):**语言 id 改为显式 int,与 server 表同模式**(s
 | 100000+ | 十万级扩展区(SDK/运营/特殊系统) | — | — |
 | 100000–199999 | AOT 空间(独立 bin,独立分配) | 30 | — |
 
-规则:段内从段首连续分配;新行取所在段下一个空位;删除打墓碑(id 不复用);段满顺延 90000 段并记录。
+规则:段内从段首连续分配;新行取所在段下一个空位;删除后 id 不复用;段满顺延 90000 段并记录。
 
 ## 3. 终态架构
 
@@ -54,7 +54,7 @@ bin:      {varint count}{(varint id, string value)}* —— int 键紧凑字典(
 运行时:   LanguageConfig = PooledHashMap<int,string>
              Get(int id) → TryGetValue,miss 返回空串
              ApplyDelta(LLP2) → upsert: map[id]=value;delete: map.Remove(id)
-增量:     LLP2 全 id 键(格式不变,语义 id 即键);sidecar 记 id 集+墓碑+per-language 哈希
+增量:     LLP2 全 id 键(格式不变,语义 id 即键);sidecar 记 id 集+per-language 哈希(基线冻结,增量 run 只读,无墓碑/回写)
 代码生成:  静态访问器 `public static string {name} => Get({id});`(id 烘焙;is_code 过滤不变)
           ToLanguageText(this int) 不变;cs-bin/java-json int 特判机制不变
 FairyGUI: customData `i18n&10034`;GetLanguageText = s => int.TryParse(s,out var i) ? Get(i) : s
@@ -65,9 +65,9 @@ FairyGUI: customData `i18n&10034`;GetLanguageText = s => int.TryParse(s,out var 
 | v1 机制 | v2 改造 |
 |---|---|
 | text 转换层(string key→查注册表→DInt 下标) | **单元格为 int 字面量**:parse int + 静态校验 id∈id 集→DInt;parse 失败/id 缺失→告警+-1(R12 语义);空→-1 |
-| KeyIndexAllocator(排序自动分配) | **退役**。注册表=语言表 id 集合(HashSet<int>);墓碑由 sidecar 记录(增量 diff 用) |
+| KeyIndexAllocator(排序自动分配) | **退役**。注册表=语言表 id 集合(HashSet<int>,无墓碑:基线冻结语义下增量以基准快照为基准) |
 | 数组 bin 序列化(SerializeLanguageArray) | **退役**。main/aot space 走 int 字典导出路径(server space 现行 ExportL10NMergedPerLanguage 机制,keyType=TInt) |
-| sidecar KeyEntries:{Key:string,Deleted} | **{Id:int,Deleted}**;基准快照 Keys→int 列表 |
+| sidecar KeyEntries:{Key:string,Deleted} | **退役**。基线快照 Keys→int 列表(无墓碑;仅基准导出写入,增量 run 只读) |
 | LLP2 | 格式不变(magic+sig+upserts+deletes);字段语义从"数组位置"变"id" |
 | 语言表 key 字段(string) | id(int)+name(string);表 index 改 id 列;key 读取处 DString→DInt |
 | EnumerateL10NKeys(key=访问器名+下标回填) | id 列→Get(id) 烘焙;name 列→访问器名 |

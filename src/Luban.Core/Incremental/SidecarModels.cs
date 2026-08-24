@@ -65,20 +65,15 @@ public class TableSidecarEntry
 /// 所有语言共享同一份 id 集合（id×语言矩阵，缺失语言列写空串），
 /// 因此 Keys 只记一次，各语言 LangSidecar.Hashes 按下标与 Keys 对齐。
 /// v2（spec 2026-08-22）：键为显式 int 语言 id（语言表 id 列），不再有 string key。
+/// 基线冻结语义：本文件仅由基准导出写入，增量 run 完全只读——
+/// 增量永远以这份基准快照 diff（累计对基准，补丁 C 相对基线 A 而非补丁 B）。
 /// </summary>
 public class L10NSidecar
 {
     public string SignatureId { get; set; } = "";
 
     /// <summary>
-    /// id 注册表（活 id ∪ 墓碑）回写区：基准与增量运行末尾都会回写（幂等关键）。
-    /// 旧格式 sidecar（string Key/Keys，v1）读入时整体视为空（迁移即全量重基准，无兼容负担）。
-    /// </summary>
-    public List<KeyEntry> KeyEntries { get; set; } = new();
-
-    /// <summary>
-    /// 基准快照：基准时刻活 id 的紧凑视图（升序；墓碑不进快照），增量 diff 的比对基准。
-    /// 增量 run 只回写 KeyEntries，不动本快照（累计对基准语义）。
+    /// 基准快照：基准时刻活 id 的升序紧凑视图，增量 diff 的比对基准。
     /// </summary>
     public List<int> Keys { get; set; } = new();
 
@@ -89,17 +84,6 @@ public class L10NSidecar
     /// 复用 TableSidecarEntry（仅用 ContentHash+Stamp，其余字段空）。
     /// </summary>
     public Dictionary<string, TableSidecarEntry> Tables { get; set; } = new();
-}
-
-/// <summary>
-/// id 注册表条目：Id = 语言表显式 int id（v2 中 id 即键，条目位置无下标语义）。
-/// Deleted=true 为墓碑（id 已从语言表删除，槽位信息保留供增量 diff，id 永不复用）。
-/// </summary>
-public class KeyEntry
-{
-    public int Id { get; set; }
-
-    public bool Deleted { get; set; }
 }
 
 /// <summary>
