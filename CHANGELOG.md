@@ -2,6 +2,19 @@
 
 ### 2026-08-24
 
+- **cs-l10n-language：空 name 的访问器名退化为 `L_{id}`（原 `_{id}`），并为空 name 单元格补 WARN**
+  - `GenerationContext` 的 key 枚举中，name 列为空（空单元格）或表无 name 列（如 server space）时，访问器名派生由 `_{id}`（如 `_20104`）改为 `L_{id}`（如 `L_20104`/server 的 `L_1`）；`L_` 前缀与手写 name 的语义边界更清晰。表有 name 列但单元格为空时输出 WARN 提示补全（表无 name 列属正常形态，不告警）。
+  - 测试：新增 `空name的key_访问器名退化为L前缀id`（断言 `L_10005` 生成、`_10005` 不生成），server space 相关断言 `_1/_2/_3` → `L_1/L_2/L_3`，Luban.Tests 53 项全绿。
+  - slg 侧配套修复：外部未提交编辑清空了 LanguageText02_Building.csv 中 20104/20106 行的 name 单元格（导致客户端 CS0117），已按 HEAD 值恢复（hospital_btn_instant/hospital_treat_complete）；修复后语言 bin 与 HEAD 逐字节一致，checksum/sidecar 的 ContentHash 回到 HEAD 值（仅 Stamp 时间戳前移），Game.Runtime/Game.Config.Runtime 编译 0 错误。
+  - 修改文件：`src/Luban.Core/GenerationContext.cs`、`src/Luban.Core/L10NKeyInfo.cs`（注释）、`src/Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`（注释）、`src/Luban.Tests/CsharpL10NLanguageCodegenTests.cs`。
+
+- **cs-l10n-language 验收调整：移除 Id 伴生常量生成 + XML 注释缩进对齐**
+  - 移除模板中的 `public const int {{name}}Id = {{id}};` 伴生常量（业务侧无引用场景，访问器 `=> Get({{id}})` 已烘焙 id），并删除 CodeTarget 中随之失效的 `X`/`XId` 同名冲突守卫；keyFlag 行级过滤与 name/id desync 守卫不变。slg 客户端唯一消费点 `ModuleLineupConst.TabLabels` 改为显式字面量 id（40124×4，注释标明 key=pve_formation_001、改名需同步）。
+  - 修复生成代码 XML 注释缩进：desc 多行时续行逐行 +4 空阶错位（`/// <summary>` 4 空格而内容行 8/12/16…空格），改为所有 doc 行统一与成员同级的 4 空格对齐；CRLF/LF 混排 desc 归一后逐行对齐，空 desc 不产生空 `///` 行。
+  - 测试：删除 3 项伴生常量用例（配对/keyFlag 过滤/冲突守卫），新增 1 项"不生成伴生 id 常量"断言（访问器保留、全类无 const），Luban.Tests 54→52 全绿。
+  - 数据零影响：同源数据下语言 bin/sidecar 逐字节不变，基准导出幂等（连跑两次 0 diff）。
+  - 修改文件：`src/Luban.CSharp/Templates/cs-l10n-language/language.sbn`、`src/Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`、`src/Luban.Tests/CsharpL10NLanguageCodegenTests.cs`。
+
 - **L10N 语言 id 显式 int 化：全链路（导表机制/数据格式/代码生成/增量）从 string key 迁移为显式 int id**
   - 背景：slg 配置工程的语言 key 原为策划填写的 string，导表期自动分配数组下标，运行态以稀疏数组+下标访问，内存占用大、解析慢，且 FairyGUI i18n 插件的 string key 在运行时无映射。本次改为与 server 表一致的**显式 int id**（万级分段：10000 通用/20000 城建/30000 战斗养成/40000 玩法任务/50000 大地图/60000 联盟社交/70000 剧情/80000 道具邮件；AOT 独立 100000-199999 段），id 写入语言表内天然幂等，string key 层从填写端彻底消失。
   - 语言表 schema：`key`(string) → `id`(int) + `name`(string，访问器命名与人读标识)；表 index 改 id 列。`text` 类型单元格语义变为 int id 字面量，导表静态检查三态：合法→DInt(id)；空→-1+WARN；缺失/非法→-1+WARN 并收集清单（不阻塞导出、不改语言表）。

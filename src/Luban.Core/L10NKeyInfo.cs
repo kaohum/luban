@@ -23,7 +23,7 @@ namespace Luban;
 /// <summary>
 /// 一条本地化 key 的枚举结果（v2 显式 int id 形态，spec 2026-08-22 D7）。
 /// <see cref="Id"/> 烘进访问器 Get(id)；<see cref="FieldName"/> 取自语言表 name 列
-/// （无 name 列的空间退化为 id 派生，如 server space）；<see cref="Desc"/> 供 XML 注释。
+/// （name 为空（含表无 name 列的空间，如 server space）时退化为 L_{id} 派生）；<see cref="Desc"/> 供 XML 注释。
 /// </summary>
 public class L10NKeyInfo
 {

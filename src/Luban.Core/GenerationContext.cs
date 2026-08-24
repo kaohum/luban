@@ -740,7 +740,7 @@ public class GenerationContext
 
     /// <summary>
     /// v2（spec 2026-08-22 D7）：key 字段（id 列，int）→ <see cref="L10NKeyInfo.Id"/>（烘进 Get(id)）；
-    /// name 列（string，可选）→ 访问器名 <see cref="L10NKeyInfo.FieldName"/>，语言表无该列时退化为 id/key 派生；
+    /// name 列（string，可选）→ 访问器名 <see cref="L10NKeyInfo.FieldName"/>，name 为空（含表无该列）时退化为 L_{id} 派生；
     /// desc 字段 → XML 注释内容。旧行为里 id 为 string key（未配 spaces 的单值路径）时 Id 导出 -1（过渡形态）。
     /// </summary>
     private List<L10NKeyInfo> EnumerateL10NKeys(IReadOnlyList<DefTable> tables, string flagFieldName = null,
@@ -831,6 +831,11 @@ public class GenerationContext
                         {
                             nameContent = nameValue.Value;
                         }
+                        else
+                        {
+                            // 表有 name 列但该行为空：访问器名退化为 L_{id} 派生，WARN 提示补全（表无 name 列属正常形态，不告警）
+                            s_logger.Warn("[l10n] 表 {table} key {key} 的 name 列为空,访问器名退化为 L_{{id}} 派生,建议补全 name", table.FullName, keyValue.GetValueObject());
+                        }
                     }
                     var descContent = string.Empty;
                     if (hasDesc)
@@ -914,8 +919,8 @@ public class GenerationContext
         var nameCount = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var key in keys)
         {
-            // 访问器名优先取 name 列（v2 D7）；无 name 列的空间（如 server）退化为 id/key 派生标识符
-            string identifierSource = string.IsNullOrWhiteSpace(key.Name) ? key.Key.ToString() : key.Name;
+            // 访问器名优先取 name 列（v2 D7）；name 为空（空单元格或表无 name 列）退化为 L_{id} 派生标识符
+            string identifierSource = string.IsNullOrWhiteSpace(key.Name) ? "L_" + key.Key : key.Name;
             string fieldName = MakeIdentifier(identifierSource);
             if (nameCount.TryGetValue(fieldName, out int count))
             {

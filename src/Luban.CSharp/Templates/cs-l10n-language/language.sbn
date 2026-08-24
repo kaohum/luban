@@ -9,14 +9,10 @@ public partial class {{ __class_name }}
 {{~ $raw_desc = k.desc != null ? k.desc : "" ~}}
 {{~ $desc = $raw_desc | string.replace "\r\n" "\n" | string.replace "\r" "\n" ~}}
 {{~ $desc_lines = $desc | string.split "\n" ~}}
-    /// <summary>
-    {{ for line in $desc_lines -}}
-    {{~ $line_trim = line | string.strip ~}}
-    /// {{ $line_trim }}
-    {{ end -}}
+    /// <summary>{{~ for line in $desc_lines ~}}{{~ $line_trim = line | string.strip }}
+    /// {{ $line_trim }}{{~ end }}
     /// </summary>
     public static string {{ k.field_name }} => Get({{ k.id }});
-    public const int {{ k.field_name }}Id = {{ k.id }};
 
 {{ end -}}
 }

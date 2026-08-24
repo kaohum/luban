@@ -33,7 +33,7 @@ namespace Luban.CSharp.CodeTarget;
 
 // 生成本地化 key 访问器映射文件（依赖 l10n 数据已加载）。
 // v2（spec 2026-08-22 D7）：单形态——只出访问器 `public static string {name} => Get({id});`，
-// id 烘焙自语言表 id 列，访问器名取 name 列（无 name 列的空间退化为 id/key 派生）；
+// id 烘焙自语言表 id 列，访问器名取 name 列（name 为空（含无 name 列的空间）退化为 L_{id} 派生）；
 // Get(int)/数据容器（dataMapRef 字典）移至各 space 的手写 partial（客户端 Tasks 7/8 提供，
 // server space 手写 partial 已有 Dictionary<int,string> + Get(int)）。
 [CodeTarget("cs-l10n-language")]
@@ -126,13 +126,10 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
     /// <summary>
     /// desync 守卫（name 维度）：同一 space 内 name 列（访问器名来源）重复，或清洗出的访问器名是 C# 关键字，
     /// 都直接抛错——访问器名是代码引用的语义身份，静默加 _2 后缀会让调用方引用到被改写的名字。
-    /// 另守卫伴生 id 常量（AF 增量）：常量名 = 访问器名 + "Id"，若恰与另一 key 的访问器名相同，
-    /// 生成类会出现重复成员（CS0101），也直接抛错。
     /// </summary>
     private void GuardKeyNameUniqueness(IReadOnlyList<L10NKeyInfo> keys, string className)
     {
         var seenNames = new HashSet<string>(StringComparer.Ordinal);
-        var accessorNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (var k in keys)
         {
             if (k.Name != null && !seenNames.Add(k.Name))
@@ -146,18 +143,6 @@ public class CsharpL10NLanguageCodeTarget : CsharpCodeTargetBase
                 throw new Exception(
                     $"[cs-l10n-language] 类 {className} 的访问器名 '{k.FieldName}'(id {k.Id}) 是 C# 关键字:" +
                     $"请修改语言表 name 列(或对应 key/id)后重新生成");
-            }
-            accessorNames.Add(k.FieldName);
-        }
-
-        // 伴生 id 常量名（FieldName + "Id"）不得命中任何访问器名；FieldName 已唯一 => 常量名彼此必唯一
-        foreach (var k in keys)
-        {
-            if (accessorNames.Contains(k.FieldName + "Id"))
-            {
-                throw new Exception(
-                    $"[cs-l10n-language] 类 {className} 的访问器名 '{k.FieldName}Id' 与 key '{k.FieldName}'(id {k.Id})" +
-                    $"的伴生 id 常量名 '{k.FieldName}Id' 冲突:生成类会出现重复成员,请修改语言表 name 列(或对应 key/id)后重新生成");
             }
         }
     }

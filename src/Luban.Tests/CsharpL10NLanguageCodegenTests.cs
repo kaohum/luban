@@ -241,52 +241,50 @@ namespace Luban.Tests
         }
 
         [Fact]
-        public void 伴生id常量_与访问器同名同id成对生成()
+        public void 不生成伴生id常量_访问器保留()
         {
-            // AF 增量：每个过过滤的 key 在访问器旁伴生 public const int {name}Id = {id};
-            // 访问器与常量共用同一 field_name 派生——名字必须逐字符配对（含 server space 的 id 派生退化形态）。
-            string confDir = MaterializeConf("id-const", DefaultLangCsv, DefaultLangServerCsv);
+            // 用户验收：`public const int {name}Id = {id};` 伴生常量无消费场景，整体移除生成与 X/XId 冲突守卫；
+            // 访问器 `public static string {name} => Get({id});` 仍按 keyFlag 过滤语义正常生成。
+            string confDir = MaterializeConf("no-id-const", DefaultLangCsv, DefaultLangServerCsv);
             RunCodeGen(confDir);
 
             string main = ReadGenerated(confDir, "LanguageConfig.cs");
-            foreach (var (name, id) in new[] { ("btn_ok", 10001), ("btn_cancel", 10002), ("mail_title", 10034), ("item_hero_name", 20015) })
-            {
-                // 成对：两行都存在，且名字/ id 一致（名字不同变换即为失败）
-                Assert.Contains($"public static string {name} => Get({id});", main);
-                Assert.Contains($"public const int {name}Id = {id};", main);
-            }
-
-            // server space：无 name 列，访问器名退化为 id 派生（_1/_2/_3），常量走同一派生
-            string server = ReadGenerated(confDir, "LanguageServerConfig.cs");
-            Assert.Contains("public const int _1Id = 1;", server);
-            Assert.Contains("public const int _2Id = 2;", server);
-            Assert.Contains("public const int _3Id = 3;", server);
-        }
-
-        [Fact]
-        public void 伴生id常量_仅过过滤的key生成_keyFlag过滤生效()
-        {
-            string confDir = MaterializeConf("id-const-keyflag", DefaultLangCsv, DefaultLangServerCsv,
-                "cs-l10n-language.space.main.keyFlag=is_code");
-            RunCodeGen(confDir);
-
-            string main = ReadGenerated(confDir, "LanguageConfig.cs");
-            Assert.Contains("public const int btn_okId = 10001;", main);
-            Assert.Contains("public const int btn_cancelId = 10002;", main);
-            // 被过滤的 key：访问器与常量都不出现
+            Assert.Contains("public static string btn_ok => Get(10001);", main);
+            Assert.Contains("public static string btn_cancel => Get(10002);", main);
+            Assert.Contains("public static string mail_title => Get(10034);", main);
+            // 类内不存在任何 const 常量（含伴生 id 常量与过滤形态）
+            Assert.DoesNotContain("const int", main);
+            Assert.DoesNotContain("btn_okId", main);
             Assert.DoesNotContain("mail_titleId", main);
-            Assert.DoesNotContain("item_hero_nameId", main);
+
+            // server space（无 name 列，L_{id} 派生退化形态 L_1/L_2/L_3）同样无常量
+            string server = ReadGenerated(confDir, "LanguageServerConfig.cs");
+            Assert.Contains("public static string L_1 => Get(1);", server);
+            Assert.DoesNotContain("const int", server);
+            Assert.DoesNotContain("L_1Id", server);
         }
 
         [Fact]
-        public void 伴生常量名与访问器名冲突_抛desync守卫()
+        public void 空name的key_访问器名退化为L前缀id()
         {
-            // key 'btn_ok' 的常量名 btn_okId 恰与另一 key 的访问器名 btn_okId 相同 => 生成类重复成员，必须抛错
-            string langCsv = DefaultLangCsv.Replace(",10034,mail_title,", ",10034,btn_okId,");
-            string confDir = MaterializeConf("id-const-clash", langCsv, DefaultLangServerCsv);
-            string messages = RunCodeGenExpectError(confDir);
-            Assert.Contains("伴生 id 常量名", messages);
-            Assert.Contains("btn_okId", messages);
+            // name 列为空（is_code=true）的行：访问器名退化为 L_{id}（取代旧的裸 _{id} 形态）；
+            // 有 name 的行不受影响；表整体无 name 列的 space 同样走 L_{id}。
+            string langCsv = DefaultLangCsv.Replace(
+                ",10002,btn_cancel,true,取消,Cancel\n",
+                ",10002,btn_cancel,true,取消,Cancel\n,10005,,true,无名字段,NoName\n");
+            string confDir = MaterializeConf("empty-name", langCsv, DefaultLangServerCsv);
+            RunCodeGen(confDir);
+
+            string main = ReadGenerated(confDir, "LanguageConfig.cs");
+            Assert.Contains("public static string L_10005 => Get(10005);", main);
+            // 不再生成裸 _{id} 形态访问器（"string _10005" 匹配访问器声明，不会误伤 L_10005）
+            Assert.DoesNotContain("string _10005", main);
+            Assert.Contains("public static string btn_ok => Get(10001);", main);
+
+            // server space（表无 name 列）同样 L_{id}
+            string server = ReadGenerated(confDir, "LanguageServerConfig.cs");
+            Assert.Contains("public static string L_1 => Get(1);", server);
+            Assert.DoesNotContain("string _1 ", server);
         }
 
         [Fact]
@@ -296,10 +294,10 @@ namespace Luban.Tests
             RunCodeGen(confDir);
 
             string server = ReadGenerated(confDir, "LanguageServerConfig.cs");
-            // server 语言表无 name 列：访问器名退化为 id 派生（_1/_2/_3），与 v1 相同；id 逐一相同
-            Assert.Contains("public static string _1 => Get(1);", server);
-            Assert.Contains("public static string _2 => Get(2);", server);
-            Assert.Contains("public static string _3 => Get(3);", server);
+            // server 语言表无 name 列：访问器名退化为 L_{id} 派生（L_1/L_2/L_3）；id 逐一相同
+            Assert.Contains("public static string L_1 => Get(1);", server);
+            Assert.Contains("public static string L_2 => Get(2);", server);
+            Assert.Contains("public static string L_3 => Get(3);", server);
             // 形态收敛：不再走 dataMapRef[...] 直查（Get(int) 由手写 partial 提供）
             Assert.DoesNotContain("dataMapRef[", server);
             Assert.DoesNotContain("public static string Get(int", server);
@@ -324,8 +322,8 @@ namespace Luban.Tests
 
             // 未配置 keyFlag 的 server space 不受影响
             string server = ReadGenerated(confDir, "LanguageServerConfig.cs");
-            Assert.Contains("public static string _1 => Get(1);", server);
-            Assert.Contains("public static string _3 => Get(3);", server);
+            Assert.Contains("public static string L_1 => Get(1);", server);
+            Assert.Contains("public static string L_3 => Get(3);", server);
         }
 
         [Fact]
