@@ -2,6 +2,13 @@
 
 ### 2026-08-24
 
+- **`l10n.silentMissingWarn`：服务器等重复导出调用静默 `[lan-index]` 缺失告警与 CSV 报告**
+  - 动机：客户端 omnibus 导出（`-t client` 调用）是 `[lan-index]` 缺失/空 WARN 与 `missing_language_ids.csv` 报告的权威来源；server 导出调用（`-t server -d json`）会重复输出同一批 WARN 并重写同一份 CSV（内容幂等，但属噪音）。新增全局布尔选项 `l10n.silentMissingWarn`（默认 false = 现状）。
+  - 行为（true 时）：text 字段仍正常静态校验、非法/空格仍导出哨兵 -1、非法格仍逐格收集条目（数据与报告内容零影响），但跳过逐格 `[lan-index][missing-id]` 与空单元格 WARN、跳过 `[lan-index][missing-id-summary]` 汇总告警、不写 `l10n.missingIdsReport` CSV（由客户端调用独占写入，文件保持原状）。
+  - 向后兼容：默认 false 完全保持现状；选项仅影响告警/报告输出，对导出产物（bin/sidecar/CSV 内容）零影响。
+  - 测试：Luban.Tests 61 -> 62（新增 `静默模式_无lanIndex告警但仍导出负一并收集`：NLog MemoryTarget 捕获断言 silent=true 下缺 id 与空单元格均无 WARN、仍导出 -1 且收集；非静默对照组有告警验证捕获机制有效），全绿。
+  - 修改文件：`src/Luban.Core/BuiltinOptionNames.cs`、`src/Luban.Core/L10NOptionUtil.cs`、`src/Luban.Core/GenerationContext.cs`、`src/Luban.Core/L10N/TextKeyIndexTransformer.cs`、`src/Luban.Core/L10N/MissingTextIdReport.cs`、`src/Luban.Core/L10N/L10NKeyIndexBuilder.cs`、`src/Luban.Tests/TextKeyIndexTransformerTests.cs`。
+
 - **导表期非法语言 id 逐格落 CSV 报告（`l10n.missingIdsReport`）**
   - 动机：text 单元格填了语言表不存在的 id 时只有控制台 WARN，策划排查需要翻日志。现在每次导出（基准/增量都刷新，含数据全量加载的调用）在 `<CWD>/Output/missing_language_ids.csv` 输出逐格明细，一行一个非法格子：`表,行标识,列,填写值,原因`。向后兼容：默认路径 `Output/missing_language_ids.csv`，选项 `l10n.missingIdsReport` 可改路径、显式置空关闭；对导出产物（bin/sidecar）零影响。
   - 行标识 = 主索引字段值（组合索引 '+' 连接），无索引（ONE 表）或值缺失退化为物理行号（AutoIndex）；列 = bean 内字段路径（嵌套 bean 以 '.' 连接，如 `reward.nameId`）；原因拆分：parse 失败（旧 string key/自由文本）= `非数字`，parse 成功但不在语言表活 id 集（含 -1 字面量与陈旧 id）= `id不存在`。空 text 单元格按设计合法不入报告（哨兵 -1 语义不变）。

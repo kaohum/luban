@@ -253,6 +253,7 @@ namespace Luban.L10N
                     $"[lan-index] l10n.textRefSpace='{refSpaceName}' 未命中任何 indexMode=true 的 space,无法解析 text 字段");
             }
             var liveIds = refSpace.KeyIndex.LiveIds; // 静态校验集 = 语言表活 id(墓碑 id 不算,删行后的引用按缺失告警)
+            bool silent = ctx.L10NSilentMissingWarn; // l10n.silentMissingWarn:客户端 omnibus 调用独占告警/报告
 
             var spaceTableNames = new HashSet<string>(ctx.L10NSpaces.SelectMany(s => s.Tables), StringComparer.Ordinal);
             var missingEntries = new List<MissingTextIdEntry>();
@@ -280,11 +281,11 @@ namespace Luban.L10N
                     {
                         continue;
                     }
-                    var trans = new TextKeyIndexTransformer(liveIds, table.FullName, "", BuildRowId(table, record), missingEntries);
+                    var trans = new TextKeyIndexTransformer(liveIds, table.FullName, "", BuildRowId(table, record), missingEntries, silent);
                     record.Data = (DBean)record.Data.Apply(trans, table.ValueTType);
                 }
             }
-            WriteMissingIdsReport(missingEntries);
+            WriteMissingIdsReport(missingEntries, silent);
         }
 
         /// <summary>
@@ -316,8 +317,9 @@ namespace Luban.L10N
         /// 零缺失仍写仅表头的空报告(显式全绿);选项显式置空 = 关闭;写失败仅告警不阻断导出。
         /// 汇总 tag 用 [lan-index][missing-id-summary] 与逐格 [lan-index][missing-id] 区分,
         /// 保证按 tag grep 的告警计数与报告行数可精确对账。
+        /// silent 模式(l10n.silentMissingWarn=true):不写 CSV(客户端 omnibus 调用独占)也不出汇总告警。
         /// </summary>
-        private static void WriteMissingIdsReport(List<MissingTextIdEntry> entries)
+        private static void WriteMissingIdsReport(List<MissingTextIdEntry> entries, bool silent)
         {
             string path = EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
                 BuiltinOptionNames.L10NMissingIdsReport, true, "Output/missing_language_ids.csv");
@@ -327,11 +329,15 @@ namespace Luban.L10N
             }
             try
             {
-                MissingTextIdReport.Write(path, entries);
+                MissingTextIdReport.Write(path, entries, silent); // silent 时写入为 no-op(文件保持客户端调用所写)
             }
             catch (Exception e)
             {
                 s_logger.Warn(e, "[lan-index][missing-id-report] 写语言 id 缺失报告失败(不阻断导出): {Path}", path);
+            }
+            if (silent)
+            {
+                return; // 静默:跳过 [lan-index][missing-id-summary] 汇总告警与空报告 Info(逐格告警已在 transformer 静默)
             }
             if (entries.Count == 0)
             {

@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Luban.Utils;
 
 namespace Luban;
 
@@ -54,6 +55,16 @@ public static class L10NOptionUtil
         // 与各 L10N 数据导出器保持一致的默认 key 字段解析
         return EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
             BuiltinOptionNames.L10NTextFileKeyFieldDesc, false, "desc");
+    }
+
+    /// <summary>
+    /// l10n.silentMissingWarn（全局布尔，默认 false）：true 时 text 非法/空 id 告警静默
+    /// （仍校验/导出 -1/收集，但不输出 WARN、不写 missingIdsReport CSV——由客户端 omnibus 调用独占报告）。
+    /// </summary>
+    public static bool GetSilentMissingWarn()
+    {
+        return DataUtil.ParseBool(EnvManager.Current.GetOptionOrDefault(
+            BuiltinOptionNames.L10NFamily, BuiltinOptionNames.L10NSilentMissingWarn, true, "false"));
     }
 }
 

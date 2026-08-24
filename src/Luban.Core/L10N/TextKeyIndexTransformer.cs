@@ -35,6 +35,7 @@ namespace Luban.L10N
     /// 不再查 string 注册表--v2 语言 id 在语言表 id 列,由 L10NKeyIndex.LiveIds 提供校验集。
     /// 非法格子按 (表,行标识,列,填写值,原因) 逐格收集(供 missing_language_ids.csv 报告);
     /// 空 text 单元格按设计合法,不收集。bean 内嵌 text 字段经由 VisitBeanField 钩子携带字段路径。
+    /// silent 模式(l10n.silentMissingWarn):校验/导出 -1/收集不变,仅静默逐格 WARN(客户端 omnibus 调用独占告警)。
     /// </summary>
     public class TextKeyIndexTransformer : DataTransfomerBase, IDataFuncVisitor2<DType>
     {
@@ -45,18 +46,20 @@ namespace Luban.L10N
         private readonly string _field;
         private readonly string _row;
         private readonly List<MissingTextIdEntry> _missingEntries;
+        private readonly bool _silent;
 
         /// <summary>bean 递归中的字段路径栈（顶层字段为栈底，'.' 连接成列名）。</summary>
         private readonly List<string> _fieldPath = new();
 
         public TextKeyIndexTransformer(HashSet<int> liveIds, string table, string field, string row,
-            List<MissingTextIdEntry> missingEntries)
+            List<MissingTextIdEntry> missingEntries, bool silent = false)
         {
             _liveIds = liveIds;
             _table = table;
             _field = field;
             _row = row;
             _missingEntries = missingEntries;
+            _silent = silent;
         }
 
         /// <summary>本次转换中逐格收集的非法语言 id 明细（一个非法格子一条），供缺失报告与汇总告警。</summary>
@@ -97,7 +100,10 @@ namespace Luban.L10N
             if (string.IsNullOrEmpty(cell))
             {
                 // 空 text 字段哨兵 -1;运行时据此跳过查表(按设计合法,不入缺失报告)
-                s_logger.Warn("[lan-index] 表 {Table} 字段 {Field} 行 {Row} 的 text 字段为空,导出为哨兵 -1", _table, CurrentField(), _row);
+                if (!_silent)
+                {
+                    s_logger.Warn("[lan-index] 表 {Table} 字段 {Field} 行 {Row} 的 text 字段为空,导出为哨兵 -1", _table, CurrentField(), _row);
+                }
                 return DInt.ValueOf(-1);
             }
             if (int.TryParse(cell, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && _liveIds.Contains(id))
@@ -107,7 +113,10 @@ namespace Luban.L10N
             // parse 失败=非数字(旧 string key/自由文本);parse 成功但不在活 id 集=id不存在(含 -1 字面量与陈旧 id)
             bool parsed = int.TryParse(cell, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
             var reason = parsed ? MissingTextIdReason.IdNotExists : MissingTextIdReason.NotANumber;
-            s_logger.Warn("[lan-index][missing-id] 表 {Table} 行 {Row} 列 {Field} 的 text 值 '{Cell}' 不是语言表中的合法 id,该格导出为哨兵 -1(运行时空文案);请在语言表补充该 id 或修正引用", _table, _row, CurrentField(), cell);
+            if (!_silent)
+            {
+                s_logger.Warn("[lan-index][missing-id] 表 {Table} 行 {Row} 列 {Field} 的 text 值 '{Cell}' 不是语言表中的合法 id,该格导出为哨兵 -1(运行时空文案);请在语言表补充该 id 或修正引用", _table, _row, CurrentField(), cell);
+            }
             _missingEntries.Add(new MissingTextIdEntry(_table, _row, CurrentField(), cell, reason));
             return DInt.ValueOf(-1);
         }

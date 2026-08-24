@@ -71,6 +71,14 @@ public static class BuiltinOptionNames
     /// </summary>
     public const string L10NMissingIdsReport = "missingIdsReport";
 
+    /// <summary>
+    /// text 单元格非法语言 id 告警静默开关（l10n.silentMissingWarn，全局布尔选项，默认 false = 现状）。
+    /// true 时仍做静态校验、非法格导出哨兵 -1、逐格收集条目（数据与报告内容零影响），但跳过逐格
+    /// [lan-index][missing-id] 与空单元格 WARN、跳过 [lan-index][missing-id-summary] 汇总告警、
+    /// 不写 missingIdsReport CSV（报告由客户端 omnibus 调用独占；服务器等只做数据导出的重复调用不重复告警）。
+    /// </summary>
+    public const string L10NSilentMissingWarn = "silentMissingWarn";
+
     public const string TypeMapperType = "type";
 
     public const string TypeMapperConstructor = "constructor";

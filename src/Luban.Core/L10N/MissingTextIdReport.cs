@@ -110,9 +110,14 @@ public static class MissingTextIdReport
         return sb.ToString();
     }
 
-    /// <summary>写报告文件（建目录、UTF-8 BOM）。零条目 -> 仅表头一行。</summary>
-    public static void Write(string path, IReadOnlyList<MissingTextIdEntry> entries)
+    /// <summary>写报告文件（建目录、UTF-8 BOM）。零条目 -> 仅表头一行。silent=true 时跳过写入（文件保持原状）。</summary>
+    public static void Write(string path, IReadOnlyList<MissingTextIdEntry> entries, bool silent = false)
     {
+        if (silent)
+        {
+            // 静默模式(l10n.silentMissingWarn):CSV 由客户端 omnibus 调用独占写入,服务器等重复调用不触碰
+            return;
+        }
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
         {

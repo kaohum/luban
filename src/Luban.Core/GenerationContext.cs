@@ -113,6 +113,9 @@ public class GenerationContext
     // 任一 space 开启 indexMode 即视为启用 text 转 int 下标模式
     public bool L10NTextIndexEnabled { get; private set; }
 
+    /// <summary>l10n.silentMissingWarn：true 时 text 非法/空 id 告警静默（客户端 omnibus 调用独占报告）。</summary>
+    public bool L10NSilentMissingWarn { get; private set; }
+
     // ExportBeans 是否含 text 标签字段(递归,含父类/子类/容器);懒计算并缓存,
     // 供各代码目标 ValidateDefinition 的共享 WARN 每目标只扫描一次
     private bool? _hasTextTaggedExportField;
@@ -651,6 +654,7 @@ public class GenerationContext
         L10NLanguages = L10NOptionUtil.GetLanguages();
         L10NTextKeyFieldName = L10NOptionUtil.GetKeyFieldName();
         L10NTextKeyFieldDesc = L10NOptionUtil.GetKeyFieldDesc();
+        L10NSilentMissingWarn = L10NOptionUtil.GetSilentMissingWarn();
         IsL10NBinarySplitDataExporter = string.Equals(DataExporterName, "l10n-bin-split", StringComparison.OrdinalIgnoreCase);
 
         // 多 space 配置(l10n.spaces);未配置时空表,走旧单值选项路径
