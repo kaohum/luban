@@ -63,6 +63,14 @@ public static class BuiltinOptionNames
 
     public const string L10NTextListFile = "textListFile";
 
+    /// <summary>
+    /// 导表期 text 单元格非法语言 id 报告文件（l10n.missingIdsReport，全局选项，非 per-space）。
+    /// 每次（基准/增量）导出全量刷新：一行一个非法格子（表,行标识,列,填写值,原因），按（表,行标识,列）
+    /// 稳定排序保证幂等；零缺失时写仅含表头的空报告；UTF-8 BOM + CRLF（Excel 友好）。
+    /// 空单元格与 ## 注释行不计入。显式置空 = 关闭报告。默认 Output/missing_language_ids.csv，相对 CWD 解析。
+    /// </summary>
+    public const string L10NMissingIdsReport = "missingIdsReport";
+
     public const string TypeMapperType = "type";
 
     public const string TypeMapperConstructor = "constructor";

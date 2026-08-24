@@ -20,6 +20,7 @@
 
 ﻿using Luban.Datas;
 using Luban.DataVisitors;
+using Luban.Defs;
 using Luban.Types;
 using NLog.LayoutRenderers;
 using System;
@@ -130,8 +131,7 @@ public abstract class DataTransfomerBase : IDataTransformer, IDataFuncVisitor2<D
                 continue;
             }
             var defField = defFields[i];
-            var fieldType = defField.CType;
-            DType newFieldValue = fieldValue.Apply(this, fieldType);
+            DType newFieldValue = VisitBeanField(data, defField, fieldValue);
             if (newFieldValue != fieldValue)
             {
                 if (newFields == null)
@@ -143,6 +143,15 @@ public abstract class DataTransfomerBase : IDataTransformer, IDataFuncVisitor2<D
             ++i;
         }
         return newFields == null ? data : new DBean(data.TType, data.ImplType, newFields);
+    }
+
+    /// <summary>
+    /// 访问 bean 的一个字段值，默认按字段类型直接递归。
+    /// 子类可覆写以携带字段上下文（如 TextKeyIndexTransformer 维护字段路径用于缺失报告/告警定位）。
+    /// </summary>
+    protected virtual DType VisitBeanField(DBean bean, DefField field, DType value)
+    {
+        return value.Apply(this, field.CType);
     }
 
     DType IDataFuncVisitor2<DType>.Accept(DArray data, TType type)

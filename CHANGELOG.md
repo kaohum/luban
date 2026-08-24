@@ -2,6 +2,15 @@
 
 ### 2026-08-24
 
+- **导表期非法语言 id 逐格落 CSV 报告（`l10n.missingIdsReport`）**
+  - 动机：text 单元格填了语言表不存在的 id 时只有控制台 WARN，策划排查需要翻日志。现在每次导出（基准/增量都刷新，含数据全量加载的调用）在 `<CWD>/Output/missing_language_ids.csv` 输出逐格明细，一行一个非法格子：`表,行标识,列,填写值,原因`。向后兼容：默认路径 `Output/missing_language_ids.csv`，选项 `l10n.missingIdsReport` 可改路径、显式置空关闭；对导出产物（bin/sidecar）零影响。
+  - 行标识 = 主索引字段值（组合索引 '+' 连接），无索引（ONE 表）或值缺失退化为物理行号（AutoIndex）；列 = bean 内字段路径（嵌套 bean 以 '.' 连接，如 `reward.nameId`）；原因拆分：parse 失败（旧 string key/自由文本）= `非数字`，parse 成功但不在语言表活 id 集（含 -1 字面量与陈旧 id）= `id不存在`。空 text 单元格按设计合法不入报告（哨兵 -1 语义不变）。
+  - 幂等门禁：按（表, 行标识, 列）稳定排序（行标识数字优先序），同输入恒定字节；UTF-8 BOM + CRLF（Excel 直接打开）；RFC 4180 转义（值可含逗号/引号/换行）；零缺失仍写仅表头的空报告（显式全绿）。
+  - 日志对账：逐格告警 tag 不变（`[lan-index][missing-id]`，消息补 `列 {Field}`），汇总行 tag 改为 `[lan-index][missing-id-summary]` 并带格子数/唯一值数/报告路径——按 tag grep 计数与报告行数可精确对账（slg 实测 732 格 = 732 行，全部为 -1 字面量；此前 217 唯一值的普查已被用户 UI id 重写工具清零为 -1 填充）。
+  - 实现：`TextKeyIndexTransformer` 收集改逐格 `MissingTextIdEntry`（表/行/列/值/原因），新增 `DataTransfomerBase.VisitBeanField` 虚钩子携带字段路径；`L10NKeyIndexBuilder.TransformTextFields` 算行标识并经 `WriteMissingIdsReport` 落盘（写失败仅告警不阻断）。
+  - 测试：Luban.Tests 53 -> 61（报告 BOM/CRLF/排序/转义/幂等/仅表头；转换器逐格收集/原因拆分/负一字面量/多格同值），全绿；slg 基准连跑两次 CSV 逐字节一致，bins/sidecar 零变化，增量导出同样刷新该文件。
+  - 修改文件：`src/Luban.Core/L10N/MissingTextIdReport.cs`（新增）、`src/Luban.Core/L10N/TextKeyIndexTransformer.cs`、`src/Luban.Core/L10N/L10NKeyIndexBuilder.cs`、`src/Luban.Core/DataTransformer/DataTransfomerBase.cs`、`src/Luban.Core/BuiltinOptionNames.cs`、`src/Luban.Tests/TextKeyIndexTransformerTests.cs`、`src/Luban.Tests/MissingTextIdReportTests.cs`（新增）。
+
 - **cs-l10n-language：空 name 的访问器名退化为 `L_{id}`（原 `_{id}`），并为空 name 单元格补 WARN**
   - `GenerationContext` 的 key 枚举中，name 列为空（空单元格）或表无 name 列（如 server space）时，访问器名派生由 `_{id}`（如 `_20104`）改为 `L_{id}`（如 `L_20104`/server 的 `L_1`）；`L_` 前缀与手写 name 的语义边界更清晰。表有 name 列但单元格为空时输出 WARN 提示补全（表无 name 列属正常形态，不告警）。
   - 测试：新增 `空name的key_访问器名退化为L前缀id`（断言 `L_10005` 生成、`_10005` 不生成），server space 相关断言 `_1/_2/_3` → `L_1/L_2/L_3`，Luban.Tests 53 项全绿。

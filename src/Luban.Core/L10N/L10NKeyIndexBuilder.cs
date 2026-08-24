@@ -255,7 +255,7 @@ namespace Luban.L10N
             var liveIds = refSpace.KeyIndex.LiveIds; // 静态校验集 = 语言表活 id(墓碑 id 不算,删行后的引用按缺失告警)
 
             var spaceTableNames = new HashSet<string>(ctx.L10NSpaces.SelectMany(s => s.Tables), StringComparer.Ordinal);
-            var missingIds = new SortedSet<string>(StringComparer.Ordinal);
+            var missingEntries = new List<MissingTextIdEntry>();
             foreach (var table in ctx.Tables)
             {
                 if (spaceTableNames.Contains(table.Name) || spaceTableNames.Contains(table.FullName))
@@ -280,14 +280,67 @@ namespace Luban.L10N
                     {
                         continue;
                     }
-                    var trans = new TextKeyIndexTransformer(liveIds, table.FullName, "", $"{table.Name}[{record.AutoIndex}]", missingIds);
+                    var trans = new TextKeyIndexTransformer(liveIds, table.FullName, "", BuildRowId(table, record), missingEntries);
                     record.Data = (DBean)record.Data.Apply(trans, table.ValueTType);
                 }
             }
-            if (missingIds.Count > 0)
+            WriteMissingIdsReport(missingEntries);
+        }
+
+        /// <summary>
+        /// 报告/告警用的行标识:主索引(IndexList[0])字段值,组合索引以 '+' 连接;
+        /// 无索引(ONE 表)或值缺失时退化为物理行号(AutoIndex)。与 sidecar 行键语义同源。
+        /// </summary>
+        internal static string BuildRowId(DefTable table, Record record)
+        {
+            if (record.Data is DBean bean && table.IndexList.Count > 0)
             {
-                s_logger.Warn("[lan-index][missing-id] 共 {Count} 个语言 id 缺失或非法(已导出为 -1,请补语言表或修正引用): {Ids}", missingIds.Count, string.Join(", ", missingIds));
+                var primary = table.IndexList[0];
+                var parts = new List<string>(primary.IndexFieldIdIndexes.Count);
+                foreach (var idx in primary.IndexFieldIdIndexes)
+                {
+                    var value = idx >= 0 && idx < bean.Fields.Count ? bean.Fields[idx] : null;
+                    if (value == null)
+                    {
+                        return record.AutoIndex.ToString();
+                    }
+                    parts.Add(value.ToString());
+                }
+                return string.Join("+", parts);
             }
+            return record.AutoIndex.ToString();
+        }
+
+        /// <summary>
+        /// 写非法语言 id 报告(l10n.missingIdsReport,默认 Output/missing_language_ids.csv,相对 CWD)并出汇总告警。
+        /// 零缺失仍写仅表头的空报告(显式全绿);选项显式置空 = 关闭;写失败仅告警不阻断导出。
+        /// 汇总 tag 用 [lan-index][missing-id-summary] 与逐格 [lan-index][missing-id] 区分,
+        /// 保证按 tag grep 的告警计数与报告行数可精确对账。
+        /// </summary>
+        private static void WriteMissingIdsReport(List<MissingTextIdEntry> entries)
+        {
+            string path = EnvManager.Current.GetOptionOrDefault(BuiltinOptionNames.L10NFamily,
+                BuiltinOptionNames.L10NMissingIdsReport, true, "Output/missing_language_ids.csv");
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+            try
+            {
+                MissingTextIdReport.Write(path, entries);
+            }
+            catch (Exception e)
+            {
+                s_logger.Warn(e, "[lan-index][missing-id-report] 写语言 id 缺失报告失败(不阻断导出): {Path}", path);
+            }
+            if (entries.Count == 0)
+            {
+                s_logger.Info("[lan-index][missing-id-report] 无缺失/非法语言 id,已写仅表头报告: {Path}", path);
+                return;
+            }
+            var uniqueValues = new SortedSet<string>(entries.Select(e => e.Value), StringComparer.Ordinal);
+            s_logger.Warn("[lan-index][missing-id-summary] 共 {Cells} 个 text 格子引用了 {Count} 个缺失/非法语言 id(已全部导出为 -1;逐格明细见 {Path}): {Ids}",
+                entries.Count, uniqueValues.Count, path, string.Join(", ", uniqueValues));
         }
 
         public static List<DefTable> MatchTables(GenerationContext ctx, L10NSpace space)
