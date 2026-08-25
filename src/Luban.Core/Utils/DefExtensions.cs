@@ -30,6 +30,12 @@ public static class DefExtensions
 {
     public static bool NeedExport(this DefField field)
     {
+        // export_only：导出期专用字段（AF-2），对所有目标一律不导出——
+        // 该 gate 是代码生成(DefBean.ExportFields)与全部数据序列化(bin/json/xml/yaml 等)的公共出口。
+        if (field.IsExportOnly)
+        {
+            return false;
+        }
         //return field.Assembly.NeedExport(field.Groups, GenerationContext.GlobalConf.Groups);
         var groupDefs = GenerationContext.GlobalConf.Groups;
         if (field.Groups.Count == 0)

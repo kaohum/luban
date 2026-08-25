@@ -18,8 +18,8 @@ dotnet run --project src/Luban -- --conf <config_file> -t <target> [options]
 # Key CLI options:
 #   --conf       Luban config file (required)
 #   -t/--target  Target name (required)
-#   -c           Code generation targets (comma-separated)
-#   -d           Data export targets (comma-separated)
+#   -c           Code generation targets (repeat flag for multiple)
+#   -d           Data export targets (repeat flag for multiple)
 #   -x           Extra args as key=value pairs
 #   -w           Watch directories for auto-regeneration
 ```

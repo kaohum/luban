@@ -70,6 +70,10 @@ public class JavaJsonUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, str
 
     public string Accept(TString type, string json, string x, int depth)
     {
+        if (GenerationContext.Current.L10NTextIndexEnabled && type.HasTag("text"))
+        {
+            return $"{x} = {json}.getAsInt();";
+        }
         return $"{x} = {json}.getAsString();";
     }
 

@@ -18,26 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-﻿using Luban.CodeTarget;
-using Luban.CSharp.TemplateExtensions;
-using Luban.CSharp.TypeVisitors;
-using Scriban;
+using System;
 
-namespace Luban.CSharp.CodeTarget;
-
-[CodeTarget("cs-newtonsoft-json")]
-public class CsharpNewtonSoftJsonCodeTarget : CsharpCodeTargetBase
+namespace Luban.L10N
 {
-    public override void ValidateDefinition(GenerationContext ctx)
+    /// <summary>text 字段语言 key 无法解析为下标时抛出(含表/字段/行上下文)。</summary>
+    public class TextKeyIndexException : Exception
     {
-        // fail-fast 须先于基类的"未适配目标"WARN,避免同一目标先 WARN 后报错
-        L10NTextIndexTypeUtil.EnsureSupportedForIndexMode(Name, ctx, ctx.ExportBeans);
-        base.ValidateDefinition(ctx);
-    }
-
-    protected override void OnCreateTemplateContext(TemplateContext ctx)
-    {
-        base.OnCreateTemplateContext(ctx);
-        ctx.PushGlobal(new CsharpNewtonSoftJsonTemplateExtension());
+        public TextKeyIndexException(string message) : base(message) { }
     }
 }

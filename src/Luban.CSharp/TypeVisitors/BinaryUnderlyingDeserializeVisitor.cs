@@ -69,6 +69,10 @@ public class BinaryUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, strin
 
     public string Accept(TString type, string bufName, string fieldName, int depth)
     {
+        if (L10NTextIndexTypeUtil.IsTextIndex(type))
+        {
+            return $"{fieldName} = {bufName}.ReadInt();";
+        }
         return $"{fieldName} = {bufName}.ReadString();";
     }
 

@@ -44,6 +44,10 @@
       <PackageReference Include="Scriban" Version="5.12.0" />
     </ItemGroup>
 
+    <ItemGroup>
+      <InternalsVisibleTo Include="Luban.Tests" />
+    </ItemGroup>
+
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
       <Exec Command="xcopy /Y $(projectDir)$(outDir)Luban.Core.dll D:\work\slg\common\config\Tools\Luban" />
     </Target>

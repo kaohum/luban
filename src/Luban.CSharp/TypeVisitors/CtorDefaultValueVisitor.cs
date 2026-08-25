@@ -34,6 +34,11 @@ public class CtorDefaultValueVisitor : DecoratorFuncVisitor<string>
 
     public override string Accept(TString type)
     {
+        if (L10NTextIndexTypeUtil.IsTextIndex(type))
+        {
+            // text 字段在 L10N index 模式下按 int 处理,默认值与 TInt 一致
+            return "default";
+        }
         return "\"\"";
     }
 

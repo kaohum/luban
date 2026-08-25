@@ -103,7 +103,7 @@ public class L10NJsonSplitDataExporter : DataExporterBase
 
         var bean = tbean.DefBean;
         var keyField = FindField(bean, keyFieldName);
-        if (keyField == null || keyField.CType is not TString)
+        if (keyField == null || !L10NBinarySplitDataExporter.IsValidKeyType(keyField.CType))
         {
             return;
         }
@@ -133,21 +133,26 @@ public class L10NJsonSplitDataExporter : DataExporterBase
 
             foreach (var (record, data) in beanRecords)
             {
-                var keyValue = data.GetField(keyFieldName) as DString;
+                var keyValue = data.GetField(keyFieldName);
                 var langValue = data.GetField(langField.Name) as DString;
                 if (keyValue == null)
                 {
                     continue;
                 }
 
-                string key = keyValue.Value;
-                if (string.IsNullOrEmpty(key))
+                // v2：语言 key 为显式 int id（int 家族装箱值）；JSON 对象键为字符串，int 按 invariant 转字符串
+                object key = L10NBinarySplitDataExporter.GetKeyValue(keyValue);
+                if (key == null)
+                {
+                    continue;
+                }
+                if (key is string s && string.IsNullOrEmpty(s))
                 {
                     continue;
                 }
 
                 string value = langValue?.Value ?? string.Empty;
-                map[key] = value;
+                map[Convert.ToString(key, System.Globalization.CultureInfo.InvariantCulture)] = value;
             }
 
             if (map.Count == 0)

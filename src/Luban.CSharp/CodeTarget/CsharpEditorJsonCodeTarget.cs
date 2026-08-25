@@ -20,6 +20,7 @@
 
 using Luban.CodeTarget;
 using Luban.CSharp.TemplateExtensions;
+using Luban.CSharp.TypeVisitors;
 using Luban.Defs;
 using Luban.Utils;
 using Scriban;
@@ -30,6 +31,14 @@ namespace Luban.CSharp.CodeTarget;
 [CodeTarget("cs-editor-json")]
 public class CsharpEditorJsonCodeTarget : CsharpCodeTargetBase
 {
+    public override void ValidateDefinition(GenerationContext ctx)
+    {
+        // fail-fast 须先于基类的"未适配目标"WARN,避免同一目标先 WARN 后报错
+        // 该目标生成全程序集 bean(见 Handle),校验集合须与生成集合一致
+        L10NTextIndexTypeUtil.EnsureSupportedForIndexMode(Name, ctx, ctx.Assembly.TypeList.OfType<DefBean>());
+        base.ValidateDefinition(ctx);
+    }
+
     public override void Handle(GenerationContext ctx, OutputFileManifest manifest)
     {
         var tasks = new List<Task<OutputFile>>();

@@ -70,6 +70,10 @@ public class UnderlyingDeclaringTypeNameVisitor : ITypeFuncVisitor<string>
 
     public string Accept(TString type)
     {
+        if (L10NTextIndexTypeUtil.IsTextIndex(type))
+        {
+            return "int";
+        }
         return "string";
     }
 

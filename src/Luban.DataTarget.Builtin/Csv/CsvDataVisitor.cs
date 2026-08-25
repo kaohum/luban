@@ -21,6 +21,8 @@
 using System.Text;
 using Luban.Datas;
 using Luban.DataVisitors;
+using Luban.Defs;
+using Luban.Utils;
 
 namespace Luban.DataExporter.Builtin.Csv;
 
@@ -48,15 +50,23 @@ public class CsvDataVisitor : ToLiteralVisitorBase
         // 对于复杂对象，转换为JSON格式字符串
         var sb = new StringBuilder();
         sb.Append('{');
-        
+
         int index = 0;
+        bool first = true;
         foreach (var field in type.Fields)
         {
-            if (index > 0) sb.Append(';');
-            
             var defField = type.ImplType.HierarchyFields[index++];
+
+            // 与 bin/json/xml/yaml 访问器同口径：不导出字段（group 不匹配 / export_only）不写出
+            if (!defField.NeedExport())
+            {
+                continue;
+            }
+            if (!first) sb.Append(';');
+            first = false;
+
             sb.Append(defField.Name).Append(':');
-            
+
             if (field != null)
             {
                 sb.Append(field.Apply(this));
@@ -66,7 +76,7 @@ public class CsvDataVisitor : ToLiteralVisitorBase
                 sb.Append("null");
             }
         }
-        
+
         sb.Append('}');
         return sb.ToString();
     }

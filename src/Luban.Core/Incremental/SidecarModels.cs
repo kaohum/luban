@@ -62,17 +62,20 @@ public class TableSidecarEntry
 
 /// <summary>
 /// L10N 基准 sidecar，全语言共享一个 SignatureId（Language bean 结构签名）。
-/// 所有语言共享同一份 key 集合（key×语言矩阵，缺失语言列写空串），
+/// 所有语言共享同一份 id 集合（id×语言矩阵，缺失语言列写空串），
 /// 因此 Keys 只记一次，各语言 LangSidecar.Hashes 按下标与 Keys 对齐。
+/// v2（spec 2026-08-22）：键为显式 int 语言 id（语言表 id 列），不再有 string key。
+/// 基线冻结语义：本文件仅由基准导出写入，增量 run 完全只读——
+/// 增量永远以这份基准快照 diff（累计对基准，补丁 C 相对基线 A 而非补丁 B）。
 /// </summary>
 public class L10NSidecar
 {
     public string SignatureId { get; set; } = "";
 
     /// <summary>
-    /// 共享 key 集合（所有语言一致，排序保证确定性）。
+    /// 基准快照：基准时刻活 id 的升序紧凑视图，增量 diff 的比对基准。
     /// </summary>
-    public List<string> Keys { get; set; } = new();
+    public List<int> Keys { get; set; } = new();
 
     public Dictionary<string, LangSidecar> Languages { get; set; } = new();
 

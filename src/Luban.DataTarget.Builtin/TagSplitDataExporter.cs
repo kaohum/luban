@@ -75,7 +75,7 @@ public class TagSplitDataExporter : DataExporterBase
             return;
         }
 
-        var tables = dataTarget.ExportAllRecords ? ctx.Tables : ctx.ExportTables;
+        var tables = SelectTables(ctx, dataTarget);
 
         switch (dataTarget.AggregationType)
         {

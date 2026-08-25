@@ -41,7 +41,7 @@ public class BaselineWithSidecarExporter : TagSplitDataExporter
 {
     public override void Handle(GenerationContext ctx, IDataTarget dataTarget, OutputFileManifest manifest)
     {
-        // 1. 正常 tag-split 导出（产 .bytes）
+        // 1. 正常 tag-split 导出（产 .bytes；TableFilter != null 时排除被组合导出器接管的表）
         base.Handle(ctx, dataTarget, manifest);
 
         // 2. 写 sidecar（失败不阻断基准导出）
@@ -70,6 +70,10 @@ public class BaselineWithSidecarExporter : TagSplitDataExporter
             if (table.Name == ChecksumTableBuilder.ChecksumTableName)
             {
                 continue; // 虚拟 checksum 表不进 sidecar（数据 MD5 每次都会变，无增量意义）
+            }
+            if (TableFilter != null && TableFilter(table))
+            {
+                continue; // 组合导出时排除的表（space 语言表）不进普通表 sidecar，由各 space 自己的 sidecar 记录
             }
 
             var records = ctx.GetTableExportDataList(table);

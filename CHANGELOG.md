@@ -1,5 +1,63 @@
 ## 变更日志
 
+### 2026-08-24
+
+- **L10N 增量导出基线冻结：移除 sidecar KeyEntries 回写与墓碑机制（增量 run 对基线完全只读）**
+  - 动机：确认增量语义为「基线一旦生成即冻结；每次增量 = 当前数据对冻结基线快照的完整重算，补丁为相对基线的累计 diff（补丁 C 相对基线 A 而非补丁 B）；客户端从 0 重放 = 基线 + 最新补丁」。此前 `IncrementalL10NDataExporter.HandleSpace` 末尾把 id 注册表（KeyEntries）回写进 `l10n.json` / `l10n.aot.json`，违反基线冻结（增量 run 改写基线文件，且 KeyEntries 随删除历史无界增长）。
+  - 行为变化：增量 run 对 L10N sidecar **完全只读**（普通表 tables.json 本就只读）；sidecar 仅由基准导出写入，格式退化为纯快照（SignatureId/Keys/Languages/Tables，移除 KeyEntries/KeyEntry 字段与墓碑）。`LoadPrevIds`/`BuildRegistry(current,prev)` 墓碑链全链路退役——审计确认其三个消费点在冻结基线语义下与「当前不存在」恒等价、对 diff 输出零影响。
+  - diff 语义（不变）：delete 仅覆盖基线快照内的 id（基线后新增又删掉的 id 无需删除补丁——从 0 重放的客户端本来就没有它）；upsert 覆盖 hash 变化 + 基线后新增的活 id。
+  - 向后兼容：旧 sidecar 的 KeyEntries 字段被反序列化器自然忽略，旧文件可直接继续用于增量 diff；格式变化仅影响下次基准导出重写的 l10n.json / l10n.aot.json（不再含 KeyEntries）。sidecar 不下发，客户端/服务器运行时零改动。
+  - 验证：slg 工程用新 DLL 跑客户端增量导表，基线四份 JSON 逐字节不变（md5 一致、mtime 未动）；zh_CN LLP2 补丁完整对齐（65/65 字节），upserts 恰好命中工作区两处语言表改动（10086 改值 + 20638 新增行），deletes 为空。
+  - 测试：Luban.Tests 62 -> 58（删除 4 项 LoadPrevIds 墓碑用例、KeyEntries 往返用例改 Keys/Languages 往返、墓碑并集用例改注册表=活 id 集），全绿。
+  - 修改文件：`src/Luban.Core/Incremental/SidecarModels.cs`、`src/Luban.Core/L10N/L10NKeyIndex.cs`、`src/Luban.Core/L10N/L10NKeyIndexBuilder.cs`、`src/Luban.DataTarget.Builtin/Incremental/IncrementalL10NDataExporter.cs`、`src/Luban.DataTarget.Builtin/Incremental/L10NBaselineWithSidecarExporter.cs`、`src/Luban.Tests/BaselineSidecarIOTests.cs`、`src/Luban.Tests/L10NKeyIndexBuilderTests.cs`、`docs/superpowers/specs/2026-08-22-l10n-explicit-int-id-design.md`。
+
+- **`l10n.silentMissingWarn`：服务器等重复导出调用静默 `[lan-index]` 缺失告警与 CSV 报告**
+  - 动机：客户端 omnibus 导出（`-t client` 调用）是 `[lan-index]` 缺失/空 WARN 与 `missing_language_ids.csv` 报告的权威来源；server 导出调用（`-t server -d json`）会重复输出同一批 WARN 并重写同一份 CSV（内容幂等，但属噪音）。新增全局布尔选项 `l10n.silentMissingWarn`（默认 false = 现状）。
+  - 行为（true 时）：text 字段仍正常静态校验、非法/空格仍导出哨兵 -1、非法格仍逐格收集条目（数据与报告内容零影响），但跳过逐格 `[lan-index][missing-id]` 与空单元格 WARN、跳过 `[lan-index][missing-id-summary]` 汇总告警、不写 `l10n.missingIdsReport` CSV（由客户端调用独占写入，文件保持原状）。
+  - 向后兼容：默认 false 完全保持现状；选项仅影响告警/报告输出，对导出产物（bin/sidecar/CSV 内容）零影响。
+  - 测试：Luban.Tests 61 -> 62（新增 `静默模式_无lanIndex告警但仍导出负一并收集`：NLog MemoryTarget 捕获断言 silent=true 下缺 id 与空单元格均无 WARN、仍导出 -1 且收集；非静默对照组有告警验证捕获机制有效），全绿。
+  - 修改文件：`src/Luban.Core/BuiltinOptionNames.cs`、`src/Luban.Core/L10NOptionUtil.cs`、`src/Luban.Core/GenerationContext.cs`、`src/Luban.Core/L10N/TextKeyIndexTransformer.cs`、`src/Luban.Core/L10N/MissingTextIdReport.cs`、`src/Luban.Core/L10N/L10NKeyIndexBuilder.cs`、`src/Luban.Tests/TextKeyIndexTransformerTests.cs`。
+
+- **导表期非法语言 id 逐格落 CSV 报告（`l10n.missingIdsReport`）**
+  - 动机：text 单元格填了语言表不存在的 id 时只有控制台 WARN，策划排查需要翻日志。现在每次导出（基准/增量都刷新，含数据全量加载的调用）在 `<CWD>/Output/missing_language_ids.csv` 输出逐格明细，一行一个非法格子：`表,行标识,列,填写值,原因`。向后兼容：默认路径 `Output/missing_language_ids.csv`，选项 `l10n.missingIdsReport` 可改路径、显式置空关闭；对导出产物（bin/sidecar）零影响。
+  - 行标识 = 主索引字段值（组合索引 '+' 连接），无索引（ONE 表）或值缺失退化为物理行号（AutoIndex）；列 = bean 内字段路径（嵌套 bean 以 '.' 连接，如 `reward.nameId`）；原因拆分：parse 失败（旧 string key/自由文本）= `非数字`，parse 成功但不在语言表活 id 集（含 -1 字面量与陈旧 id）= `id不存在`。空 text 单元格按设计合法不入报告（哨兵 -1 语义不变）。
+  - 幂等门禁：按（表, 行标识, 列）稳定排序（行标识数字优先序），同输入恒定字节；UTF-8 BOM + CRLF（Excel 直接打开）；RFC 4180 转义（值可含逗号/引号/换行）；零缺失仍写仅表头的空报告（显式全绿）。
+  - 日志对账：逐格告警 tag 不变（`[lan-index][missing-id]`，消息补 `列 {Field}`），汇总行 tag 改为 `[lan-index][missing-id-summary]` 并带格子数/唯一值数/报告路径——按 tag grep 计数与报告行数可精确对账（slg 实测 732 格 = 732 行，全部为 -1 字面量；此前 217 唯一值的普查已被用户 UI id 重写工具清零为 -1 填充）。
+  - 实现：`TextKeyIndexTransformer` 收集改逐格 `MissingTextIdEntry`（表/行/列/值/原因），新增 `DataTransfomerBase.VisitBeanField` 虚钩子携带字段路径；`L10NKeyIndexBuilder.TransformTextFields` 算行标识并经 `WriteMissingIdsReport` 落盘（写失败仅告警不阻断）。
+  - 测试：Luban.Tests 53 -> 61（报告 BOM/CRLF/排序/转义/幂等/仅表头；转换器逐格收集/原因拆分/负一字面量/多格同值），全绿；slg 基准连跑两次 CSV 逐字节一致，bins/sidecar 零变化，增量导出同样刷新该文件。
+  - 修改文件：`src/Luban.Core/L10N/MissingTextIdReport.cs`（新增）、`src/Luban.Core/L10N/TextKeyIndexTransformer.cs`、`src/Luban.Core/L10N/L10NKeyIndexBuilder.cs`、`src/Luban.Core/DataTransformer/DataTransfomerBase.cs`、`src/Luban.Core/BuiltinOptionNames.cs`、`src/Luban.Tests/TextKeyIndexTransformerTests.cs`、`src/Luban.Tests/MissingTextIdReportTests.cs`（新增）。
+
+- **cs-l10n-language：空 name 的访问器名退化为 `L_{id}`（原 `_{id}`），并为空 name 单元格补 WARN**
+  - `GenerationContext` 的 key 枚举中，name 列为空（空单元格）或表无 name 列（如 server space）时，访问器名派生由 `_{id}`（如 `_20104`）改为 `L_{id}`（如 `L_20104`/server 的 `L_1`）；`L_` 前缀与手写 name 的语义边界更清晰。表有 name 列但单元格为空时输出 WARN 提示补全（表无 name 列属正常形态，不告警）。
+  - 测试：新增 `空name的key_访问器名退化为L前缀id`（断言 `L_10005` 生成、`_10005` 不生成），server space 相关断言 `_1/_2/_3` → `L_1/L_2/L_3`，Luban.Tests 53 项全绿。
+  - slg 侧配套修复：外部未提交编辑清空了 LanguageText02_Building.csv 中 20104/20106 行的 name 单元格（导致客户端 CS0117），已按 HEAD 值恢复（hospital_btn_instant/hospital_treat_complete）；修复后语言 bin 与 HEAD 逐字节一致，checksum/sidecar 的 ContentHash 回到 HEAD 值（仅 Stamp 时间戳前移），Game.Runtime/Game.Config.Runtime 编译 0 错误。
+  - 修改文件：`src/Luban.Core/GenerationContext.cs`、`src/Luban.Core/L10NKeyInfo.cs`（注释）、`src/Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`（注释）、`src/Luban.Tests/CsharpL10NLanguageCodegenTests.cs`。
+
+- **cs-l10n-language 验收调整：移除 Id 伴生常量生成 + XML 注释缩进对齐**
+  - 移除模板中的 `public const int {{name}}Id = {{id}};` 伴生常量（业务侧无引用场景，访问器 `=> Get({{id}})` 已烘焙 id），并删除 CodeTarget 中随之失效的 `X`/`XId` 同名冲突守卫；keyFlag 行级过滤与 name/id desync 守卫不变。slg 客户端唯一消费点 `ModuleLineupConst.TabLabels` 改为显式字面量 id（40124×4，注释标明 key=pve_formation_001、改名需同步）。
+  - 修复生成代码 XML 注释缩进：desc 多行时续行逐行 +4 空阶错位（`/// <summary>` 4 空格而内容行 8/12/16…空格），改为所有 doc 行统一与成员同级的 4 空格对齐；CRLF/LF 混排 desc 归一后逐行对齐，空 desc 不产生空 `///` 行。
+  - 测试：删除 3 项伴生常量用例（配对/keyFlag 过滤/冲突守卫），新增 1 项"不生成伴生 id 常量"断言（访问器保留、全类无 const），Luban.Tests 54→52 全绿。
+  - 数据零影响：同源数据下语言 bin/sidecar 逐字节不变，基准导出幂等（连跑两次 0 diff）。
+  - 修改文件：`src/Luban.CSharp/Templates/cs-l10n-language/language.sbn`、`src/Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`、`src/Luban.Tests/CsharpL10NLanguageCodegenTests.cs`。
+
+- **L10N 语言 id 显式 int 化：全链路（导表机制/数据格式/代码生成/增量）从 string key 迁移为显式 int id**
+  - 背景：slg 配置工程的语言 key 原为策划填写的 string，导表期自动分配数组下标，运行态以稀疏数组+下标访问，内存占用大、解析慢，且 FairyGUI i18n 插件的 string key 在运行时无映射。本次改为与 server 表一致的**显式 int id**（万级分段：10000 通用/20000 城建/30000 战斗养成/40000 玩法任务/50000 大地图/60000 联盟社交/70000 剧情/80000 道具邮件；AOT 独立 100000-199999 段），id 写入语言表内天然幂等，string key 层从填写端彻底消失。
+  - 语言表 schema：`key`(string) → `id`(int) + `name`(string，访问器命名与人读标识)；表 index 改 id 列。`text` 类型单元格语义变为 int id 字面量，导表静态检查三态：合法→DInt(id)；空→-1+WARN；缺失/非法→-1+WARN 并收集清单（不阻塞导出、不改语言表）。
+  - 数据格式：语言 bin 统一为 **int 键紧凑字典** `{varint count}{(varint id, string value)}*`（即 server space 原格式，main/aot 复用）；LLP2 增量 patch 布局不变、字段语义改 id；sidecar `KeyEntries` 改 `{Id:int, Deleted:bool}`（旧 string sidecar 读入视为空，一次性重基准）。
+  - 机制退役：`KeyIndexAllocator`（自动分配）、`SerializeLanguageArray`（数组导出）、LLP1 string-key 路径全部删除；同数据两次基准逐字节一致（幂等由 id 在表内保证）。
+  - 修改文件：`src/Luban.Core/L10N/`（L10NKeyIndexBuilder/TextKeyIndexTransformer/L10NKeyIndex/L10NSpace/L10NSpaceParser）、`src/Luban.Core/Incremental/`（SidecarModels/L10NChecksumUtil/KeyIndexAllocator 删除）、`src/Luban.DataTarget.Builtin/Incremental/`（omnibus 基准/增量导出器、IncrementalL10NDataExporter 等）、`src/Luban.DataTarget.Builtin/L10NBinarySplitDataExporter.cs`。
+- **多管线合并为 omnibus：5 次 Luban 调用并为 2 次（game.conf 单 conf 承载 main/aot/server 三空间）**
+  - `l10n.spaces=main,aot,server` 空间化配置（每空间 tables/languages/outputFile/outputDir/sidecar 等），新增 omnibus-baseline/omnibus-incremental 导出器；languageServer 产物逐字节零差异（数据路径不动）。`{target}.excludeTables` 选项解决语言表与 cs-bin 三方撞名。
+  - 修改文件：`src/Luban.DataTarget.Builtin/Incremental/OmnibusBaselineExporter.cs`（新增）、`OmnibusIncrementalExporter.cs`（新增）、`src/Luban.Core/CodeTarget/CodeTargetBase.cs`、`src/Luban.Core/BuiltinOptionNames.cs` 等。
+- **cs-l10n-language v2：单形态访问器 + Id 伴生常量 + genAccessors 门控**
+  - 生成侧只出 `public static string {{name}} => Get({{id}});` 访问器（Get/存储移手写 partial，PooledHashMap 字典查），并新增伴生常量 `public const int {{name}}Id = {{id}};`（业务传 id 不写死字面量）；is_code/keyFlag 过滤语义保留，`X`/`XId` 同名冲突显式报错。
+  - 新选项 `l10n.<space>.genAccessors`（缺省 true，字面 "false" 关闭）：server/aot 空间零生成访问器文件。
+  - 修改文件：`src/Luban.CSharp/Templates/cs-l10n-language/language.sbn`、`src/Luban.CSharp/CodeTarget/CsharpL10NLanguageCodeTarget.cs`、`src/Luban.Core/L10NKeyInfo.cs`、`src/Luban.Core/GenerationContext.cs`。
+- **字段级 `tags="export_only"` 标记：is_code 等导表期标记不再序列化进二进制**
+  - 背景：is_code 只用于导表期决定哪些 key 生成快捷代码，进 bin 徒增体积。新增 DefField 级 export_only 标记：字段保留于 schema/加载/过滤器，但所有数据序列化（bin/json/csv）与生成读写代码跳过；标记翻转 SignatureId（一次性重基准）。顺带修复 csv/json convertor 缺 `NeedExport` 检查导致 group 过滤字段漏跳过的既有 bug。
+  - 修改文件：`src/Luban.Core/Defs/DefField.cs`、`src/Luban.Core/Utils/DefExtensions.cs`、`src/Luban.Core/TypeVisitors/StructureSignature.cs`、`src/Luban.DataTarget.Builtin/Csv/CsvDataVisitor.cs`、`src/Luban.DataTarget.Builtin/Json/JsonConvertor.cs`。
+- **测试：Luban.Tests 新增至 54 项**（转换三态/id 集校验/sidecar IO/LLP2/int 字典序列化/codegen 形态/genAccessors/export_only/Id 常量配对等），配套 `docs/superpowers/` 设计与计划文档。
+
 ### 2026-08-20
 
 - **cs-l10n-language 新增 keyFlag 选项：按行级 bool 标记字段过滤 LanguageConfig 静态快链**

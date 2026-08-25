@@ -63,6 +63,22 @@ public static class BuiltinOptionNames
 
     public const string L10NTextListFile = "textListFile";
 
+    /// <summary>
+    /// 导表期 text 单元格非法语言 id 报告文件（l10n.missingIdsReport，全局选项，非 per-space）。
+    /// 每次（基准/增量）导出全量刷新：一行一个非法格子（表,行标识,列,填写值,原因），按（表,行标识,列）
+    /// 稳定排序保证幂等；零缺失时写仅含表头的空报告；UTF-8 BOM + CRLF（Excel 友好）。
+    /// 空单元格与 ## 注释行不计入。显式置空 = 关闭报告。默认 Output/missing_language_ids.csv，相对 CWD 解析。
+    /// </summary>
+    public const string L10NMissingIdsReport = "missingIdsReport";
+
+    /// <summary>
+    /// text 单元格非法语言 id 告警静默开关（l10n.silentMissingWarn，全局布尔选项，默认 false = 现状）。
+    /// true 时仍做静态校验、非法格导出哨兵 -1、逐格收集条目（数据与报告内容零影响），但跳过逐格
+    /// [lan-index][missing-id] 与空单元格 WARN、跳过 [lan-index][missing-id-summary] 汇总告警、
+    /// 不写 missingIdsReport CSV（报告由客户端 omnibus 调用独占；服务器等只做数据导出的重复调用不重复告警）。
+    /// </summary>
+    public const string L10NSilentMissingWarn = "silentMissingWarn";
+
     public const string TypeMapperType = "type";
 
     public const string TypeMapperConstructor = "constructor";
@@ -76,6 +92,12 @@ public static class BuiltinOptionNames
     public const string LineEnding = "lineEnding";
 
     public const string FileEncoding = "fileEncoding";
+
+    /// <summary>
+    /// 代码目标级表排除名单（{targetName}.excludeTables，逗号分隔表名，OrdinalIgnoreCase 匹配 Name 与 FullName）。
+    /// 被排除的表不生成表级代码（表类 / Tables manager 条目 / 表派生枚举项），record bean 类不受影响。
+    /// </summary>
+    public const string ExcludeTables = "excludeTables";
 
     public const string CsvSourceOutputDir = "csvSourceOutputDir";
 

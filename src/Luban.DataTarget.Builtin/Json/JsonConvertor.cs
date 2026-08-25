@@ -23,6 +23,7 @@ using Luban.DataLoader;
 using Luban.DataLoader.Builtin;
 using Luban.Datas;
 using Luban.Defs;
+using Luban.Utils;
 
 namespace Luban.DataExporter.Builtin.Json;
 
@@ -53,7 +54,8 @@ public class JsonConvertor : JsonDataVisitor
 
             // 特殊处理 bean 多态类型
             // 另外，不生成  xxx:null 这样
-            if (d == null)
+            // 与 JsonDataVisitor 同口径：不导出字段（group 不匹配 / export_only）不写出
+            if (d == null || !defField.NeedExport())
             {
                 //x.WriteNullValue();
             }
