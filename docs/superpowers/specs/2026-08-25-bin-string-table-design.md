@@ -57,15 +57,14 @@
 
 ```
 [WriteSize(count)]                                   ← 去重后字符串数
-[WriteSize(off0) WriteSize(len0)]                    ← 索引区：每串的 (blob 内偏移, 字节长)
-[WriteSize(off1) WriteSize(len1)]
+[WriteSize(len0) WriteSize(len1)]                    ← 索引区：每串的 UTF-8 字节长（offset 由累加推导，不存储）
 ... 共 count 条
-[UTF-8 字节流]                                       ← blob 区：连续拼接，offset 相对 blob 起点（0 基）
+[UTF-8 字节流]                                       ← blob 区：按索引顺序连续拼接
 ```
 
 - **index = 首见顺序**（遍历 records 的确定性顺序），保证行字节确定、增量 diff 自洽。
 - 空字符串自然入表去重，不特判；`null` 值映射到空串 index（与现状 round-trip 一致）。
-- 该布局下读取端**只扫索引区即可拿到全部 (off,len)，无需解码 UTF-8、零 string 分配**——这是懒解码的基础。
+- 该布局下读取端**只扫索引区即可拿到全部 (len, 累加 offset)，无需解码 UTF-8、零 string 分配**——这是懒解码的基础。
 - count=0 时无索引区、无 blob，读取端直接跳过。
 
 ### 4.2 全量表文件（bin）
@@ -121,10 +120,10 @@ LLP2 patch：
 ## 5. 运行时策略（C# 具体；其它语言见契约）
 
 ### 5.1 普通表：v1 eager
-- `ByteBuf.ReadStringTable()`：解析索引区 + 顺序解码 blob → `string[]`；blob 用完即弃（不驻留，与现流式模型一致）。
-- `ByteBuf.ReadStringIndex()`：`return _stringTable[ReadSize()];`。
-- 字符串表状态挂在 **ByteBuf** 上 → 生成代码的 `Deserialize`/`ReadFrom` 签名不变，模板改动最小。
-- `StreamByteBuf`：`ReadStringTable()` 基于 `virtual ReadSize/ReadString` 实现（或流式直读），自动继承其零分配解码优化。
+- `ByteBuf.ReadStringTable()`（**virtual**）：解析索引区 + 顺序解码 blob → `string[]`；blob 用完即弃（不驻留，与现流式模型一致）。
+- `ByteBuf.ReadStringIndex()`：`return _stringTable[ReadSize()];`，越界/无表抛 `SerializationException`。
+- 字符串表状态挂在 **ByteBuf** 上（`protected string[] _stringTable`）→ 生成代码的 `Deserialize`/`ReadFrom` 签名不变，模板改动最小。
+- `StreamByteBuf`：**override `ReadStringTable()`**（流式直读、复用 `mStringBuffer` 零分配解码）；基类实现用 `ReadSize()` + 原始字节读 helper，同样可被流式子类复用。
 
 ### 5.2 l10n：懒解码 + 缓存
 - 加载（`LanguageConfig` 构造）：解析索引区 → `(off,len)` 数组；**读 blob 拷贝进持久 `byte[]`**（10MB 级，常驻）；建 `id → stringIndex` 映射。
@@ -152,7 +151,8 @@ string ReadStringIndex();    // 返回表内引用；无表/越界 → 异常或
 | `IncrementalDataExporter.WritePatch` | DLP1 头部加字符串表 |
 | `IncrementalL10NDataExporter.HandleSpace` | LLP2 头部加字符串表 |
 | `L10NBinarySplitDataExporter.SerializeDictionaryToBinary` | 改 l10n 字典为索引区+blob 布局 |
-| `BinaryIndexExportor`、`BaselineWithSidecarExporter` | 记录字节切到索引模式（与最终文件一致，保 diff 自洽） |
+| `IncrementalDataExporter` 行 diff（sidecar 行 MD5 + 当前行 MD5） | **保持内联 `BinaryDataVisitor.Ins`**——行 MD5 是内容比较键，切索引模式会在字符串表 index 漂移时产生 diff 噪声 |
+| `BinaryIndexExportor` | **不动**（无调用方，死代码，与 bin-offset 同源残留） |
 | `BinaryRecordOffsetDataTarget` | **不动**（决策 B） |
 
 ## 7. 代码生成模板改动
