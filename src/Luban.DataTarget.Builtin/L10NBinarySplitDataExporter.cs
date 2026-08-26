@@ -25,7 +25,7 @@ using System.Linq;
 using Luban.DataTarget;
 using Luban.Defs;
 using Luban.Datas;
-using Luban.Serialization;
+using Luban.Incremental;
 using Luban.Types;
 
 namespace Luban.DataExporter.Builtin;
@@ -112,29 +112,11 @@ public class L10NBinarySplitDataExporter : DataExporterBase
         return data.GetValueObject();
     }
 
-    internal static void WriteKey(ByteBuf buf, object key, TType type)
-    {
-        switch (type)
-        {
-            case TString: buf.WriteString((string)key); break;
-            case TInt: buf.WriteInt((int)key); break;
-            case TLong: buf.WriteLong((long)key); break;
-            case TShort: buf.WriteShort((short)key); break;
-            case TByte: buf.WriteByte((byte)key); break;
-            default: throw new NotSupportedException($"Unsupported key type: {type.GetType().Name}");
-        }
-    }
-
     internal static byte[] SerializeDictionaryToBinary(Dictionary<object, string> dict, TType keyType)
     {
-        var buf = new ByteBuf();
-        buf.WriteSize(dict.Count);
-        foreach (var kv in dict)
-        {
-            WriteKey(buf, kv.Key, keyType);
-            buf.WriteString(kv.Value ?? string.Empty);
-        }
-        return buf.CopyData();
+        // 与 L10NChecksumUtil.SerializeLanguageBytes 逐字节同布局（checksum 指纹口径 = 实际文件，
+        // spec 2026-08-25 §4.4：字符串表 + 索引引用）；实现委托给后者，避免两处序列化漂移。
+        return L10NChecksumUtil.SerializeLanguageBytes(dict, keyType);
     }
 
     internal static void ExportL10NTablePerLanguage(DefTable table, List<Record> records,
@@ -218,7 +200,7 @@ public class L10NBinarySplitDataExporter : DataExporterBase
     /// 把多张多语言表的记录按语言合并进同一个二进制文件：{outputDirPrefix}/{lang}/{outputFileName}.bytes。
     /// 典型场景：LanguageCode 表（代码引用 key）与 LanguageText 表（策划文本 key）合并导出一个运行时 bin。
     /// v2（spec 2026-08-22）：语言 key 为显式 int（keyType=TInt），序列化即 int 键紧凑字典
-    /// [WriteSize: count] [WriteKey(id) WriteString(value)]*——indexMode space（main/aot）与
+    /// [字符串表][WriteSize: pairCount][WriteKey(id) WriteSize(valueIndex)]*（v3 spec 2026-08-25）——indexMode space（main/aot）与
     /// server space 统一走本路径，数组格式（ExportL10NArrayPerLanguage）已退役删除。
     /// outputDirPrefix 供 omnibus 的 space 路由传入 space.OutputDir；null/空 = 根目录（旧行为）。
     /// </summary>

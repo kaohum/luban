@@ -124,6 +124,7 @@ export class {{table.name}} {
     private _dataMap: Map<{{declaring_type_name key_type}}, {{declaring_type_name value_type}}>
     private _dataList: {{declaring_type_name value_type}}[]
     constructor(_buf_: ByteBuf) {
+        _buf_.readStringTable()
         this._dataMap = new Map<{{declaring_type_name key_type}}, {{declaring_type_name value_type}}>()
         this._dataList = []
         for(let n = _buf_.readInt(); n > 0; n--) {
@@ -151,6 +152,7 @@ export class {{table.name}} {
     private _dataList: {{declaring_type_name value_type}}[]
     
     constructor(_buf_: ByteBuf) {
+        _buf_.readStringTable()
         this._dataList = []
         for(let n = _buf_.readInt(); n > 0; n--) {
             let _v: {{declaring_type_name value_type}}
@@ -173,6 +175,7 @@ export class {{table.name}} {
 
     private _data: {{declaring_type_name value_type}}
     constructor(_buf_: ByteBuf) {
+        _buf_.readStringTable()
         if (_buf_.readInt() != 1) throw new Error('table mode=one, but size != 1')
         {{deserialize 'this._data' '_buf_' value_type}}
     }

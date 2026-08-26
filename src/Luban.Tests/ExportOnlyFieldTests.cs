@@ -169,17 +169,41 @@ namespace Luban.Tests
             return File.ReadAllText(Path.Combine(new[] { dir }.Concat(parts).ToArray()), Encoding.UTF8);
         }
 
-        /// <summary>解 bin：签名串 + count + 每行 [id:int, name:string, (有标记字段时) isCode:bool]；返回逐行结果。</summary>
+        /// <summary>
+        /// 解 bin：签名串 + 字符串表(count + len×count + blob) + recordCount + 每行 [id:int, name:index, (有标记字段时) isCode:bool]；
+        /// 返回签名与逐行结果。
+        /// </summary>
         private static (string Signature, List<(int Id, string Name, bool? IsCode)> Rows) ParseBin(byte[] bytes, bool expectBool)
         {
             var buf = new ByteBuf(bytes);
             string signature = buf.ReadString();
+            int sc = buf.ReadSize();
+            var lens = new int[sc];
+            for (int i = 0; i < sc; i++)
+            {
+                lens[i] = buf.ReadSize();
+            }
+            var table = new string[sc];
+            for (int i = 0; i < sc; i++)
+            {
+                if (lens[i] == 0)
+                {
+                    table[i] = string.Empty;
+                    continue;
+                }
+                var strBytes = new byte[lens[i]];
+                for (int j = 0; j < lens[i]; j++)
+                {
+                    strBytes[j] = buf.ReadByte();
+                }
+                table[i] = Encoding.UTF8.GetString(strBytes);
+            }
             int count = buf.ReadSize();
             var rows = new List<(int, string, bool?)>();
             for (int i = 0; i < count; i++)
             {
                 int id = buf.ReadInt();
-                string name = buf.ReadString();
+                string name = table[buf.ReadSize()];
                 bool? isCode = expectBool ? buf.ReadBool() : null;
                 rows.Add((id, name, isCode));
             }
@@ -229,7 +253,7 @@ namespace Luban.Tests
             Assert.DoesNotContain("IsCode", languageCs);
             Assert.DoesNotContain("ReadBool", languageCs);
             Assert.Contains("Id = _buf.ReadInt();", languageCs);
-            Assert.Contains("Name = _buf.ReadString();", languageCs);
+            Assert.Contains("Name = _buf.ReadStringIndex();", languageCs);
 
             // bin：按"无 bool"布局逐字节恰好消费完（若残留 bool 字节，name 读串位/Remaining 断言必炸）
             byte[] bin = File.ReadAllBytes(Path.Combine(dir, "Output", "data-bin", "languagetext.bytes"));

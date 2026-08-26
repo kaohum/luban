@@ -30,6 +30,9 @@ public class BinaryDataVisitor : IDataActionVisitor<ByteBuf>
 {
     public static BinaryDataVisitor Ins { get; } = new();
 
+    /// <summary>非空时开启字符串表索引模式：DString 写 WriteSize(index) 并自动注册（null 归一空串）。</summary>
+    public StringTableBuilder StringTable { get; set; }
+
     public void Accept(DBool type, ByteBuf x)
     {
         x.WriteBool(type.Value);
@@ -72,7 +75,14 @@ public class BinaryDataVisitor : IDataActionVisitor<ByteBuf>
 
     public void Accept(DString type, ByteBuf x)
     {
-        x.WriteString(type.Value);
+        if (StringTable != null)
+        {
+            x.WriteSize(StringTable.GetOrAddIndex(type.Value));
+        }
+        else
+        {
+            x.WriteString(type.Value);
+        }
     }
 
     public void Accept(DDateTime type, ByteBuf x)

@@ -29,12 +29,23 @@ public class BinaryDataTarget : DataTargetBase
 {
     protected override string DefaultOutputFileExt => "bytes";
 
-    private void WriteList(DefTable table, List<Record> datas, ByteBuf x)
+    private void WriteStringTableAndList(DefTable table, List<Record> datas, ByteBuf x)
     {
+        var builder = new StringTableBuilder();
+        var visitor = new BinaryDataVisitor { StringTable = builder };
+        // 第一遍：注册全部字符串（写入丢弃）
+        var tmp = new ByteBuf();
+        foreach (var d in datas)
+        {
+            d.Data.Apply(visitor, tmp);
+        }
+        // 字符串表
+        builder.Write(x);
+        // 第二遍：记录（索引模式）
         x.WriteSize(datas.Count);
         foreach (var d in datas)
         {
-            d.Data.Apply(BinaryDataVisitor.Ins, x);
+            d.Data.Apply(visitor, x);
         }
     }
 
@@ -43,7 +54,7 @@ public class BinaryDataTarget : DataTargetBase
         var bytes = new ByteBuf();
         // 结构签名头：客户端解表(Create)前校验，避免 .bytes 结构与代码 bean 不一致导致解表错乱
         bytes.WriteString(table.SignatureId);
-        WriteList(table, records, bytes);
+        WriteStringTableAndList(table, records, bytes);
         return CreateOutputFile($"{table.OutputDataFile}.{OutputFileExt}", bytes.CopyData());
     }
 }

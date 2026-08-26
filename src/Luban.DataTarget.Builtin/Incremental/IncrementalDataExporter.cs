@@ -210,24 +210,47 @@ public class IncrementalDataExporter : DataExporterBase
     }
 
     /// <summary>
-    /// 写 DLP1 patch：magic + signatureId + upsert 行字节 + delete 主键。
+    /// 写 DLP1 patch 字节：magic + signatureId + 头部字符串表 + upsertCount + upsert 行字节（索引模式）
+    /// + deleteCount + delete 主键索引（string 主键也入字符串表）。
     /// upsert 行字节与全表 .bytes 一致（BinaryDataVisitor 按 group 过滤），客户端复用现有反序列化。
+    /// 注意：行级 diff 的 MD5（sidecar 与当前）保持 BinaryDataVisitor.Ins 内联，不切字符串表模式——
+    /// 行 MD5 是内容比较键，索引模式会在字符串表 index 漂移时产生 diff 噪声。
     /// </summary>
-    private static OutputFile WritePatch(DefTable table, string signatureId, List<Record> upserts, List<string> deletes)
+    internal static ByteBuf WritePatchBytes(string signatureId, List<Record> upserts, List<string> deletes)
     {
+        var builder = new StringTableBuilder();
+        var visitor = new BinaryDataVisitor { StringTable = builder };
+        // 第一遍：注册 upsert 记录字符串 + delete 主键（首见顺序）
+        var tmp = new ByteBuf();
+        foreach (var rec in upserts)
+        {
+            rec.Data.Apply(visitor, tmp);
+        }
+        foreach (var k in deletes)
+        {
+            builder.GetOrAddIndex(k);
+        }
+
         var buf = new ByteBuf();
         PatchFormat.WriteMagic(buf, PatchFormat.MagicTable);
         buf.WriteString(signatureId);
+        builder.Write(buf);
         buf.WriteSize(upserts.Count);
         foreach (var rec in upserts)
         {
-            rec.Data.Apply(BinaryDataVisitor.Ins, buf);
+            rec.Data.Apply(visitor, buf);
         }
         buf.WriteSize(deletes.Count);
         foreach (var k in deletes)
         {
-            buf.WriteString(k);
+            buf.WriteSize(builder.GetOrAddIndex(k));
         }
+        return buf;
+    }
+
+    private static OutputFile WritePatch(DefTable table, string signatureId, List<Record> upserts, List<string> deletes)
+    {
+        var buf = WritePatchBytes(signatureId, upserts, deletes);
         return new OutputFile { File = $"{table.OutputDataFile}.patch.bytes", Content = buf.CopyData() };
     }
 }

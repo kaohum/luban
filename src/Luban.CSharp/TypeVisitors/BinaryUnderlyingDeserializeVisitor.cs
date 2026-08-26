@@ -73,7 +73,7 @@ public class BinaryUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, strin
         {
             return $"{fieldName} = {bufName}.ReadInt();";
         }
-        return $"{fieldName} = {bufName}.ReadString();";
+        return $"{fieldName} = {bufName}.ReadStringIndex();";
     }
 
     public string Accept(TDateTime type, string bufName, string fieldName, int depth)

@@ -42,6 +42,7 @@ public partial class {{__name}}
     
     public {{__name}}(ByteBuf _buf)
     {
+        _buf.ReadStringTable();
         int n = _buf.ReadSize();
         _dataMap = new System.Collections.Generic.Dictionary<{{declaring_type_name key_type}}, {{declaring_type_name value_type}}>(n);
         _dataList = new System.Collections.Generic.List<{{declaring_type_name value_type}}>(n);
@@ -88,6 +89,7 @@ public partial class {{__name}}
 
     public {{__name}}(ByteBuf _buf)
     {
+        _buf.ReadStringTable();
         int n = _buf.ReadSize();
         _dataList = new System.Collections.Generic.List<{{declaring_type_name value_type}}>(n);
         for(int i = n ; i > 0 ; --i)
@@ -142,6 +144,7 @@ public partial class {{__name}}
 
     public {{__name}}(ByteBuf _buf)
     {
+        _buf.ReadStringTable();
         int n = _buf.ReadSize();
         if (n != 1) throw new SerializationException("table mode=one, but size != 1");
         {{deserialize '_buf' '_data' value_type}}

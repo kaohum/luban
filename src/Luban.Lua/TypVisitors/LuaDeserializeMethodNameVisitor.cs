@@ -69,7 +69,7 @@ public class LuaDeserializeMethodNameVisitor : ITypeFuncVisitor<string>
 
     public string Accept(TString type)
     {
-        return "readString";
+        return "readStringIndex";
     }
 
     public string Accept(TBean type)

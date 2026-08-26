@@ -187,6 +187,7 @@ impl {{name}} {
         let mut data_map: {{map_type}} = Default::default();
         let mut data_list: Vec<{{value_type}}> = vec![];
 
+        buf.read_string_table()?;
         for x in (0..buf.read_size()).rev() {
             {{deserialize_row "row" "buf" table.value_ttype}}
             data_list.push(row.clone());
@@ -219,6 +220,7 @@ impl {{name}} {
     pub fn new(mut buf: ByteBuf) -> Result<std::sync::Arc<{{name}}>, LubanError> {
         let mut data_list: Vec<{{value_type}}> = vec![];
 
+        buf.read_string_table()?;
         for x in (0..buf.read_size()).rev() {
             {{deserialize_row "row" "buf" table.value_ttype}}
             data_list.push(row.clone());
@@ -269,6 +271,7 @@ impl {{name}} {
 
 impl {{name}} {
     pub fn new(mut buf: ByteBuf) -> Result<std::sync::Arc<{{name}}>, LubanError> {
+        buf.read_string_table()?;
         let n = buf.read_size();
         if n != 1 { return Err(LubanError::Table(format!("table mode=one, but size != 1"))); }
         {{deserialize 'data' 'buf' table.value_ttype}}

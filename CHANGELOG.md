@@ -1,5 +1,17 @@
 ## 变更日志
 
+### 2026-08-26
+
+- **二进制导出字符串表化（bin String-Table）：全量/DLP1/l10n 字典/LLP2 四种产物统一"索引区+blob"字符串表，string 字段改索引引用**
+  - 动机：旧格式每条记录内联 string（`WriteSize(字节数)+UTF-8`），表内重复字符串在文件与运行时内存中各自独立；运行时每次 `ReadString()` 都重新 UTF-8 解码分配。新格式把每张表/每个产物头部的字符串去重成统一布局 `[WriteSize(count)] [WriteSize(len)×count] [UTF-8 blob]`，记录内所有 string 字段（含列表/映射/嵌套/多态 bean）改为 `WriteSize(stringIndex)`——重复字符串共享同一对象、每个唯一串只解码一次、文件体积随重复率显著缩小（合成 10000 行/250 唯一串实测 -92.5%）。
+  - 运行时策略：**普通表 v1 eager**（`ByteBuf.ReadStringTable()` 解码为 `string[]`，blob 用后即弃，内存模型与改造前一致）；**l10n 语言字典懒解码**（加载只解析索引区、blob 常驻，`Get(id)` 首次访问才 UTF-8 解码并缓存，未访问文本零 string 对象；一局游戏实际只展示小部分文本，加载耗时与内存双赢——低重复 ~15MB 全唯一场景加载提速 4.9x、取用 10% 子集提速 2.2x、常驻内存减半）。
+  - 覆盖：`bin` 全量表、DLP1 增量 patch、l10n 语言字典（`languageconfig.bytes` 等）、LLP2 增量 patch 四种产物；cs-bin/java-bin/go-bin/cpp-rawptr-bin/cpp-sharedptr-bin/typescript-bin/rust-bin/lua-bin 全部 bin 代码目标模板与 string 反序列化发射同步改造。各语言运行时按契约新增 `ReadStringTable()`/`ReadStringIndex()`（C# 由 slg 客户端包实现，其余语言由各自消费方实现）。
+  - 关键设计：字符串表 index = 首见顺序（确定性，行字节稳定）；增量行级 diff 的 sidecar 行 MD5 **保持内联序列化**（内容比较键，不受索引漂移影响）；bin-offset / BinaryIndexExportor（死代码）不动；`L10NChecksumUtil.SerializeLanguageBytes` 与 l10n 实际文件逐字节同布局（checksum 指纹口径一致）。
+  - **向后兼容：不兼容**（决策：直接替换默认格式、不加版本标记）。所有 bin 消费方必须同步升级运行时 + 重新生成代码；增量需**重新基准**（行字节表示变化，重建 `Output/baseline/*.json`）。旧客户端读新文件会脏读/异常，要求全量同步升级。
+  - 修复：slg 运行时 `ByteBuf.ReadStringTable`/`StreamByteBuf.ReadStringTable` 初版实现按"len/blob 交错"读，与"索引区在前"布局不符、真实数据直接 EOF——基准测试捕获后已修复（先读全部 len 再读 blob），与手写 `LanguageConfig`（本就正确）对齐。
+  - 验证：Luban.Tests 新增 8 项字符串表专项测试（构建器/全量格式/DLP1/l10n 字典/cs 及各语言 codegen 形状），全套 71/71 全绿；slg 端到端：基准导出 148 个 .bytes 全部新格式（0 残留旧格式）、增量导出 DLP1/LLP2 patch 结构校验通过、group 过滤差分验证（`-i dev` 含 dev 表 / s-only 表排除）。
+  - 修改文件：`src/Luban.Core/Serialization/StringTableBuilder.cs`（新增）、`src/Luban.DataTarget.Builtin/Binary/BinaryDataTarget.cs`、`src/Luban.DataTarget.Builtin/Binary/BinaryDataVisitor.cs`、`src/Luban.DataTarget.Builtin/Incremental/IncrementalDataExporter.cs`、`src/Luban.DataTarget.Builtin/Incremental/IncrementalL10NDataExporter.cs`、`src/Luban.DataTarget.Builtin/L10NBinarySplitDataExporter.cs`、`src/Luban.Core/Incremental/L10NChecksumUtil.cs`、各语言 `*BinUnderlyingDeserializeVisitor.cs` 与 bin 模板（cs/java/go/cpp×2/typescript/rust/lua）、`src/Luban.Tests/`（9 个测试文件）。
+
 ### 2026-08-24
 
 - **L10N 增量导出基线冻结：移除 sidecar KeyEntries 回写与墓碑机制（增量 run 对基线完全只读）**

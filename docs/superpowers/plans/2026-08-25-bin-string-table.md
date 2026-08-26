@@ -822,15 +822,15 @@ git commit -m "feat: l10n 语言字典与 LLP2 patch 字符串表化（checksum 
 
 ```csharp
 [Fact]
-public void csBin_生成代码_string为ReadStringIndex_表构造读字符串表()
+public void csBin_生成代码_string为ReadStringIndex()
 {
     string codeDir = RunCodegen(); // 复用 Task 2 管线辅助，仅取 code 输出
     string tableFile = Path.Combine(codeDir, "LanguageText.cs");
     Assert.True(File.Exists(tableFile), "表类文件缺失");
     string code = File.ReadAllText(tableFile);
-    Assert.Contains("ReadStringTable()", code);   // 表构造首行
     Assert.Contains("ReadStringIndex()", code);   // string 字段
     Assert.DoesNotContain("_buf.ReadString();", code);
+    // 注：ReadStringTable() 断言归 Task 6（表构造入口改动后补）
 }
 ```
 
@@ -892,9 +892,9 @@ list 与 one 分支同样处理（one 分支 `if (n != 1) throw ...` 之前）�
 - [ ] **Step 2: 运行确认**
 
 Run: `cd src && dotnet test Luban.Tests --filter "FullyQualifiedName~CsBinStringTableCodegenTests"`
-Expected: PASS（该测试已断言 `ReadStringTable()` 存在）
+Expected: PASS
 
-> 若测试断言表文件路径不符，按生成文件名调整（`LanguageText.cs` 或含 topModule 路径，以实际为准）。
+> 本任务在 Task 5 的测试文件中**追加** `ReadStringTable()` 断言（原测试只断言 `ReadStringIndex()`）：`Assert.Contains("ReadStringTable()", code);`。若生成文件名不符（`LanguageText.cs` 或含 topModule 路径），以实际为准。
 
 - [ ] **Step 3: Commit**
 

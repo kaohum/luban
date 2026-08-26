@@ -104,8 +104,9 @@ public class IncrementalL10NDataExporter : DataExporterBase
     /// Stamp 取 langStamps——单独使用传全表口径 GetL10NLangStamps()，omnibus 传 per-space 口径 GetL10NSpaceLangStamps(space)，
     /// 后者与 space sidecar / space checksumconfig 语言行同值）。基线冻结：sidecar 只读不写，不产生任何副作用。
     /// 返回该 space 通过 gate 的基准 SignatureId。
-    /// v2：LLP2 字段为显式 int 语言 id（不再是数组注册表位置），布局不变（magic+sig+varint upsertCount+
-    /// (int id, string value)*+varint delCount+int id*）；id 即键，无需下标换算，基准 id 缺失于当前时
+    /// v2：LLP2 字段为显式 int 语言 id（不再是数组注册表位置）；v3（spec 2026-08-25）头部加字符串表，
+    /// 布局 magic+sig+[字符串表]+varint upsertCount+(int id, WriteSize(valIndex))*+varint delCount+int id*；
+    /// id 即键，无需下标换算，基准 id 缺失于当前时
     /// 自然落 delete 分支（基准侧损伤自愈为"该 id 已删除"）。
     /// </summary>
     internal static string HandleSpace(GenerationContext ctx, L10NSpace space, OutputFileManifest manifest,
@@ -189,11 +190,18 @@ public class IncrementalL10NDataExporter : DataExporterBase
             var buf = new ByteBuf();
             PatchFormat.WriteMagic(buf, PatchFormat.MagicL10N2);
             buf.WriteString(baseline.SignatureId);
-            buf.WriteSize(upserts.Count);
-            foreach (var (id, val) in upserts)
+            // 字符串表：upsert 的 val 全部入表（LLP2 新布局，spec 2026-08-25 §4.4）
+            var builder = new StringTableBuilder();
+            foreach (var upsert in upserts)
             {
-                buf.WriteInt(id);
-                buf.WriteString(val);
+                builder.GetOrAddIndex(upsert.Value);
+            }
+            builder.Write(buf);
+            buf.WriteSize(upserts.Count);
+            foreach (var upsert in upserts)
+            {
+                buf.WriteInt(upsert.Id);
+                buf.WriteSize(builder.GetOrAddIndex(upsert.Value));
             }
             buf.WriteSize(deletes.Count);
             foreach (var id in deletes)

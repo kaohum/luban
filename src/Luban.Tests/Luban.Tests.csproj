@@ -11,11 +11,17 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Luban.Core\Luban.Core.csproj" />
+    <ProjectReference Include="..\Luban.Cpp\Luban.Cpp.csproj" />
     <ProjectReference Include="..\Luban.CSharp\Luban.CSharp.csproj" />
+    <ProjectReference Include="..\Luban.Golang\Luban.Golang.csproj" />
+    <ProjectReference Include="..\Luban.Java\Luban.Java.csproj" />
+    <ProjectReference Include="..\Luban.Typescript\Luban.Typescript.csproj" />
     <ProjectReference Include="..\Luban.DataLoader.Builtin\Luban.DataLoader.Builtin.csproj" />
     <ProjectReference Include="..\Luban.DataTarget.Builtin\Luban.DataTarget.Builtin.csproj" />
     <ProjectReference Include="..\Luban.DataValidator.Builtin\Luban.DataValidator.Builtin.csproj" />
     <ProjectReference Include="..\Luban.L10N\Luban.L10N.csproj" />
+    <ProjectReference Include="..\Luban.Lua\Luban.Lua.csproj" />
+    <ProjectReference Include="..\Luban.Rust\Luban.Rust.csproj" />
     <ProjectReference Include="..\Luban.Schema.Builtin\Luban.Schema.Builtin.csproj" />
   </ItemGroup>
 </Project>

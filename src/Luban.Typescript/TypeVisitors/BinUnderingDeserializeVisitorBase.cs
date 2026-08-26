@@ -69,7 +69,7 @@ public abstract class BinUnderingDeserializeVisitorBase : ITypeFuncVisitor<strin
 
     public string Accept(TString type, string bufName, string fieldName, int depth)
     {
-        return $"{fieldName} = {bufName}.readString()";
+        return $"{fieldName} = {bufName}.readStringIndex()";
     }
 
     public abstract string Accept(TBean type, string bufVarName, string fieldName, int depth);

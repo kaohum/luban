@@ -15,7 +15,8 @@ class {{__name}}
     
     public:
     bool load(::luban::ByteBuf& _buf)
-    {        
+    {
+        if (!_buf.readStringTable()) return false;
         int n;
         if (!_buf.readSize(n)) return false;
         for(; n > 0 ; --n)
@@ -57,7 +58,8 @@ class {{__name}}
     
         public:
         bool load(::luban::ByteBuf& _buf)
-        {        
+        {
+            if (!_buf.readStringTable()) return false;
             int n;
             if (!_buf.readSize(n)) return false;
             for(; n > 0 ; --n)
@@ -118,6 +120,7 @@ class {{__name}}
 
     bool load(::luban::ByteBuf& _buf)
     {
+        if (!_buf.readStringTable()) return false;
         int n;
         if (!_buf.readSize(n)) return false;
         if (n != 1) return false;

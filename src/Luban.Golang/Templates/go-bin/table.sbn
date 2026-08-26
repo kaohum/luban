@@ -18,6 +18,9 @@ type {{go_full_name}} struct {
 }
 
 func New{{go_full_name}}(_buf *luban.ByteBuf) (*{{go_full_name}}, error) {
+	if _, err := _buf.ReadStringTable() ; err != nil {
+		return nil, err
+	}
 	if size, err := _buf.ReadSize() ; err != nil {
 		return nil, err
 	} else {
@@ -63,6 +66,9 @@ type {{go_full_name}} struct {
 }
 
 func New{{go_full_name}}(_buf *luban.ByteBuf) (*{{go_full_name}}, error) {
+	if _, err := _buf.ReadStringTable() ; err != nil {
+		return nil, err
+	}
 	if size, err := _buf.ReadSize() ; err != nil {
 		return nil, err
 	} else {
@@ -96,6 +102,9 @@ type {{go_full_name}} struct {
 }
 
 func New{{go_full_name}}(_buf *luban.ByteBuf) (*{{go_full_name}}, error) {
+	if _, err := _buf.ReadStringTable() ; err != nil {
+		return nil, err
+	}
 	if size, err := _buf.ReadSize() ; err != nil {
 		return nil, err
     } else if size != 1 {

@@ -20,7 +20,8 @@ public final class {{__name}} {
     public {{__name}}(ByteBuf _buf) {
         _dataMap = new java.util.HashMap<{{declaring_box_type_name key_type}}, {{declaring_box_type_name __value_type}}>();
         _dataList = new java.util.ArrayList<{{declaring_box_type_name __value_type}}>();
-        
+        _buf.readStringTable();
+
         for(int n = _buf.readSize() ; n > 0 ; --n) {
             {{declaring_box_type_name __value_type}} _v;
             {{deserialize '_buf' '_v' __value_type}}
@@ -43,7 +44,8 @@ public final class {{__name}} {
     
     public {{__name}}(ByteBuf _buf) {
         _dataList = new java.util.ArrayList<{{declaring_box_type_name __value_type}}>();
-        
+        _buf.readStringTable();
+
         for(int n = _buf.readSize() ; n > 0 ; --n) {
             {{declaring_box_type_name __value_type}} _v;
             {{deserialize '_buf' '_v' __value_type}}
@@ -62,6 +64,7 @@ public final class {{__name}} {
     public final {{declaring_type_name __value_type}} data() { return _data; }
 
     public {{__name}}(ByteBuf _buf) {
+        _buf.readStringTable();
         int n = _buf.readSize();
         if (n != 1) throw new SerializationException("table mode=one, but size != 1");
         {{deserialize '_buf' '_data' __value_type}}

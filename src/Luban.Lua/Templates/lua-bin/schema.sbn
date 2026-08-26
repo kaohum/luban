@@ -62,6 +62,8 @@ local function InitTypes(methods)
     local readSize = methods.readSize
 
     local readString = methods.readString
+    local readStringIndex = methods.readStringIndex
+    local readStringTable = methods.readStringTable
 
     local function readList(bs, keyFun)
         local list = {}

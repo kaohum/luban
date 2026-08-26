@@ -68,7 +68,7 @@ public abstract class CppUnderlyingDeserializeVisitorBase : ITypeFuncVisitor<str
 
     public string Accept(TString type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)
     {
-        return $"if(!{bufName}.readString({fieldName})) return false;";
+        return $"if(!{bufName}.readStringIndex({fieldName})) return false;";
     }
 
     public string Accept(TBean type, string bufName, string fieldName, int depth, ITypeFuncVisitor<string> typeVisitor)

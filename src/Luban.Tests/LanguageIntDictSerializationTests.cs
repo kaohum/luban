@@ -15,11 +15,12 @@
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR USE OR OTHER DEALINGS IN THE
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Luban.Incremental;
 using Luban.Serialization;
 using Luban.Types;
@@ -29,7 +30,8 @@ namespace Luban.Tests
 {
     /// <summary>
     /// v2 int 键紧凑字典序列化（LanguageArraySerializationTests 的替代——数组序列化已随
-    /// spec 2026-08-22 退役删除）：[WriteSize: count] [WriteInt(id) WriteString(value)]*。
+    /// spec 2026-08-22 退役删除）。v3（spec 2026-08-25）改为字符串表布局：
+    /// [字符串表][WriteSize: pairCount][WriteInt(id) WriteSize(valueIndex)]*。
     /// 与 server space 现行 bin 及 main/aot space 基准 bin（omnibus 合并导出）逐字节同布局，
     /// 也是 ComputePerLanguageFileMd5 的指纹口径。
     /// </summary>
@@ -43,12 +45,25 @@ namespace Luban.Tests
             byte[] bytes = L10NChecksumUtil.SerializeLanguageBytes(map, TInt.Create(false, null));
 
             var buf = new ByteBuf(bytes);
-            Assert.Equal(2, buf.ReadSize());
+            // 字符串表：VA / VB 两个值（首见顺序随字典迭代序，但 (id,value) 成对绑定断言与序无关）
+            int sc = buf.ReadSize();
+            Assert.Equal(2, sc);
+            var lens = new int[sc];
+            var table = new string[sc];
+            for (int i = 0; i < sc; i++) lens[i] = buf.ReadSize();
+            for (int i = 0; i < sc; i++)
+            {
+                if (lens[i] == 0) { table[i] = ""; continue; }
+                var bytes2 = new byte[lens[i]];
+                for (int j = 0; j < lens[i]; j++) bytes2[j] = buf.ReadByte();
+                table[i] = Encoding.UTF8.GetString(bytes2);
+            }
+            Assert.Equal(2, buf.ReadSize()); // pairCount
             var got = new Dictionary<int, string>();
             for (int i = 0; i < 2; i++)
             {
                 int id = buf.ReadInt();
-                got[id] = buf.ReadString();
+                got[id] = table[buf.ReadSize()];
             }
             Assert.Equal("VA", got[10001]);
             Assert.Equal("VB", got[20002]);
@@ -62,9 +77,12 @@ namespace Luban.Tests
             byte[] bytes = L10NChecksumUtil.SerializeLanguageBytes(map, TInt.Create(false, null));
 
             var buf = new ByteBuf(bytes);
-            Assert.Equal(1, buf.ReadSize());
+            // 字符串表含空串（null 归一为空串入表），value 索引指向空串
+            Assert.Equal(1, buf.ReadSize()); // 字符串表 count=1
+            Assert.Equal(0, buf.ReadSize()); // 空串 len=0（blob 无字节）
+            Assert.Equal(1, buf.ReadSize()); // pairCount
             Assert.Equal(10001, buf.ReadInt());
-            Assert.Equal("", buf.ReadString());
+            Assert.Equal(0, buf.ReadSize()); // value 索引 = 空串 index 0
             Assert.Equal(0, buf.Remaining);
         }
 
@@ -75,7 +93,8 @@ namespace Luban.Tests
                 new Dictionary<object, string>(), TInt.Create(false, null));
 
             var buf = new ByteBuf(bytes);
-            Assert.Equal(0, buf.ReadSize());
+            Assert.Equal(0, buf.ReadSize()); // 字符串表 count=0
+            Assert.Equal(0, buf.ReadSize()); // pairCount=0
             Assert.Equal(0, buf.Remaining);
         }
 
@@ -86,9 +105,16 @@ namespace Luban.Tests
             byte[] bytes = L10NChecksumUtil.SerializeLanguageBytes(map, TInt.Create(false, null));
 
             var buf = new ByteBuf(bytes);
+            // 字符串表：单条目，UTF-8 字节写入 blob
             Assert.Equal(1, buf.ReadSize());
+            int len = buf.ReadSize();
+            Assert.Equal(Encoding.UTF8.GetByteCount("中文·值"), len);
+            var bytes2 = new byte[len];
+            for (int j = 0; j < len; j++) bytes2[j] = buf.ReadByte();
+            Assert.Equal("中文·值", Encoding.UTF8.GetString(bytes2));
+            Assert.Equal(1, buf.ReadSize()); // pairCount
             Assert.Equal(10034, buf.ReadInt());
-            Assert.Equal("中文·值", buf.ReadString());
+            Assert.Equal(0, buf.ReadSize()); // value 索引 = 0
             Assert.Equal(0, buf.Remaining);
         }
 

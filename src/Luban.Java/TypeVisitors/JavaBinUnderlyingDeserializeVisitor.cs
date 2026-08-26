@@ -72,7 +72,7 @@ class JavaBinUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string, int
 
     public string Accept(TString type, string bufName, string fieldName, int depth)
     {
-        return $"{fieldName} = {bufName}.readString();";
+        return $"{fieldName} = {bufName}.readStringIndex();";
     }
 
     public string Accept(TBean type, string bufName, string fieldName, int depth)

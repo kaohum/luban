@@ -134,7 +134,8 @@ public static class L10NChecksumUtil
     /// <summary>
     /// space 限定版：计算 space 每种语言的整语言文件 MD5。
     /// v2（spec 2026-08-22）：main/aot/server 三类 space 统一走 int 字典序列化
-    /// （[WriteSize: count] [WriteKey(id) WriteString(value)]*，与 {outputDir} 下各语言 bin 布局一致——
+    /// （v3 spec 2026-08-25 起为 [字符串表][pairCount][WriteKey(id) WriteSize(valueIndex)]*，
+    /// 与 {outputDir} 下各语言 bin 布局一致——
     /// indexMode space 为合并单文件 {lang}/{outputFile}.bytes，非 indexMode space 为逐表 {lang}/{table}.bytes，
     /// 序列化布局相同）。数组序列化（SerializeLanguageArray）已随 v2 退役删除。
     /// space.Tables == null 表示"全部表"（omnibus 旧路径合成 space 专用），与旧全局行为等价。
@@ -156,18 +157,35 @@ public static class L10NChecksumUtil
     }
 
     /// <summary>
-    /// 把 per-语言 (key -> value) 序列化为与 languageconfig.bytes 逐条一致的字节：
-    /// [WriteSize: count] [WriteKey(key) WriteString(value)]*
+    /// 把 per-语言 (key -> value) 序列化为与 languageconfig.bytes 逐条一致的字节（spec 2026-08-25 §4.4）：
+    /// [字符串表][WriteSize: pairCount][WriteKey(key) 或 WriteSize(keyIndex)][WriteSize(valueIndex)]*
+    /// 字符串表内容：所有 value 文本；string-key space 的 key 字符串也入表（int key 不入表）。
     /// v2 语言 key 为显式 int（keyType=TInt），即 int 键紧凑字典格式（server space 同款，spec D3）。
     /// </summary>
     public static byte[] SerializeLanguageBytes(Dictionary<object, string> map, TType keyType)
     {
+        var builder = new StringTableBuilder();
+        bool stringKey = keyType is TString;
+        if (stringKey)
+        {
+            foreach (var kv in map) builder.GetOrAddIndex((string)kv.Key);
+        }
+        foreach (var kv in map) builder.GetOrAddIndex(kv.Value);
+
         var buf = new ByteBuf();
+        builder.Write(buf);
         buf.WriteSize(map.Count);
         foreach (var kv in map)
         {
-            WriteKey(buf, kv.Key, keyType);
-            buf.WriteString(kv.Value ?? string.Empty);
+            if (stringKey)
+            {
+                buf.WriteSize(builder.GetOrAddIndex((string)kv.Key));
+            }
+            else
+            {
+                WriteKey(buf, kv.Key, keyType);
+            }
+            buf.WriteSize(builder.GetOrAddIndex(kv.Value));
         }
         return buf.CopyData();
     }

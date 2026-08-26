@@ -70,7 +70,7 @@ public class BinUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, string, 
 
     public string Accept(TString type, string fieldName, string bufName, string err, int depth)
     {
-        return $"{{ if {fieldName}, {err} = {bufName}.ReadString(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
+        return $"{{ if {fieldName}, {err} = {bufName}.ReadStringIndex(); {err} != nil {{ {err} = errors.New(\"error\"); return }} }}";
     }
 
     public string Accept(TDateTime type, string fieldName, string bufName, string err, int depth)
