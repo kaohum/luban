@@ -36,7 +36,8 @@ namespace Luban.DataExporter.Builtin.Incremental;
 
 /// <summary>
 /// 增量导出器（普通表）。
-/// 读基准 sidecar -> 结构 gate（SignatureId 全表扫，任何不一致整批中止）-> 行级 diff（按主键）-> 出 DLP1 patch + _delta.manifest。
+/// 读基准 sidecar -> 结构 gate（SignatureId/Mode/IdentityIndex 全表扫，任何不一致整批中止）
+/// -> 双路径 diff：有身份索引（含单例表）走行级 diff 出 DLP1 patch；无稳定行键（整表替换模式）出 DLF1 全表 patch。
 /// delta 永远是"基准->当前"累计 diff，服务器只留最新一份。
 /// </summary>
 [DataExporter("incremental")]
@@ -70,6 +71,10 @@ public class IncrementalDataExporter : DataExporterBase
         {
             throw new InvalidOperationException($"[incremental] sidecar target 不匹配：sidecar={baseline.Target}，当前={ctx.Target.Name}");
         }
+        if (baseline.Version < SidecarFormat.CurrentVersion)
+        {
+            throw new InvalidOperationException("[增量导出已终止] sidecar 为旧格式（缺少身份索引信息，行键口径不兼容）。请重新执行基准导出（会刷新 sidecar）。");
+        }
 
         // 本次参与增量 diff 的表集合（TableFilter=null 时即 ctx.Tables，行为不变）
         var tables = ctx.Tables;
@@ -96,6 +101,17 @@ public class IncrementalDataExporter : DataExporterBase
             if (curSig != baseEntry.SignatureId)
             {
                 offenders.Add((table.FullName, $"SignatureId 期望 {baseEntry.SignatureId} 实际 {curSig}（结构变化）"));
+                continue;
+            }
+            if (baseEntry.Mode != table.Mode.ToString())
+            {
+                offenders.Add((table.FullName, $"表模式变化 {baseEntry.Mode} -> {table.Mode}"));
+                continue;
+            }
+            var curIdentityName = BaselineWithSidecarExporter.GetIdentityIndexName(table);
+            if (baseEntry.IdentityIndex != curIdentityName)
+            {
+                offenders.Add((table.FullName, $"身份索引期望 '{baseEntry.IdentityIndex}' 实际 '{curIdentityName}'（数据唯一性漂移会使客户端代码与行键口径分叉）"));
             }
         }
         foreach (var kv in baseline.Tables)
@@ -128,57 +144,104 @@ public class IncrementalDataExporter : DataExporterBase
             }
 
             var baseEntry = baseline.Tables[table.FullName];
-            if (!IsStableKey(table, baseEntry))
-            {
-                // 无稳定行键（联合索引首字段不唯一，或 ONE 无索引退化）：不进增量，客户端走基准全量
-                Console.WriteLine($"[incremental] 跳过 {table.FullName}（无稳定行键，进基准全量）");
-                continue;
-            }
-
             var records = ctx.GetTableExportDataList(table);
-            var curHashes = new Dictionary<string, (string Hash, Record Rec)>(records.Count);
-            foreach (var rec in records)
-            {
-                var buf = new ByteBuf();
-                rec.Data.Apply(BinaryDataVisitor.Ins, buf);
-                curHashes[BaselineWithSidecarExporter.ExtractKey(table, rec)] = (FileUtil.CalcMD5(buf.CopyData()), rec);
-            }
 
-            var upserts = new List<Record>();
-            var deletes = new List<string>();
-            foreach (var kv in curHashes)
+            if (table.IsSingletonTable || baseEntry.IdentityIndex != "")
             {
-                if (!baseEntry.RowHashes.TryGetValue(kv.Key, out var oldHash) || oldHash != kv.Value.Hash)
+                // 行 diff 模式：身份索引全键比对（gate 已保证当前身份索引与基准一致）
+                var identity = BaselineWithSidecarExporter.GetIdentityIndex(table);
+                BaselineWithSidecarExporter.ValidateIdentityFields(table, identity);
+                var curHashes = new Dictionary<string, (string Hash, Record Rec)>(records.Count);
+                foreach (var rec in records)
                 {
-                    upserts.Add(kv.Value.Rec); // 新 key 或行内容变化
+                    var buf = new ByteBuf();
+                    rec.Data.Apply(BinaryDataVisitor.Ins, buf);
+                    curHashes[BaselineWithSidecarExporter.ExtractKey(table, rec, identity)] = (FileUtil.CalcMD5(buf.CopyData()), rec);
                 }
-            }
-            foreach (var kv in baseEntry.RowHashes)
-            {
-                if (!curHashes.ContainsKey(kv.Key))
+                if (!table.IsSingletonTable && curHashes.Count != records.Count)
                 {
-                    deletes.Add(kv.Key); // 基准有、当前无 -> 删除
+                    // gate 兜底：身份键在当前数据重复（字典覆盖），行 diff 不可靠
+                    throw new InvalidOperationException($"[增量导出已终止] 表 '{table.FullName}' 身份索引 '{baseEntry.IdentityIndex}' 的键在当前数据中重复，请修正数据或重新执行基准导出。");
                 }
-            }
 
-            if (upserts.Count == 0 && deletes.Count == 0)
-            {
-                continue; // 无变化不产 patch
-            }
+                var upserts = new List<Record>();
+                var deletes = new List<string>();
+                foreach (var kv in curHashes)
+                {
+                    if (!baseEntry.RowHashes.TryGetValue(kv.Key, out var oldHash) || oldHash != kv.Value.Hash)
+                    {
+                        upserts.Add(kv.Value.Rec); // 新 key 或行内容变化
+                    }
+                }
+                foreach (var kv in baseEntry.RowHashes)
+                {
+                    if (!curHashes.ContainsKey(kv.Key))
+                    {
+                        deletes.Add(kv.Key); // 基准有、当前无 -> 删除
+                    }
+                }
 
-            var file = WritePatch(table, baseEntry.SignatureId, upserts, deletes);
-            manifest.AddFile(file);
-            changedTables.Add(new DeltaManifestEntry
+                if (upserts.Count == 0 && deletes.Count == 0)
+                {
+                    continue; // 无变化不产 patch
+                }
+
+                var file = WritePatch(table, baseEntry.SignatureId, upserts, deletes);
+                manifest.AddFile(file);
+                changedTables.Add(new DeltaManifestEntry
+                {
+                    Table = table.FullName,
+                    UpsertCount = upserts.Count,
+                    DeleteCount = deletes.Count,
+                    PatchFile = file.File,
+                    Stamp = table.Stamp,
+                });
+            }
+            else
             {
-                Table = table.FullName,
-                UpsertCount = upserts.Count,
-                DeleteCount = deletes.Count,
-                PatchFile = file.File,
-                Stamp = table.Stamp,
-            });
+                // 整表替换模式：无稳定行键（基准时无单值索引或身份键数据重复），记录序号口径只做变更检测
+                var curHashes = new Dictionary<string, string>(records.Count);
+                foreach (var rec in records)
+                {
+                    var buf = new ByteBuf();
+                    rec.Data.Apply(BinaryDataVisitor.Ins, buf);
+                    curHashes[rec.AutoIndex.ToString()] = FileUtil.CalcMD5(buf.CopyData());
+                }
+                if (records.Count == baseEntry.RowCount && RowHashesEqual(curHashes, baseEntry.RowHashes))
+                {
+                    continue; // 内容无变化不产 patch
+                }
+
+                var file = WriteReplacePatch(table, records);
+                manifest.AddFile(file);
+                changedTables.Add(new DeltaManifestEntry
+                {
+                    Table = table.FullName,
+                    UpsertCount = records.Count,
+                    DeleteCount = 0,
+                    PatchFile = file.File,
+                    Stamp = table.Stamp,
+                });
+            }
         }
 
         return (changedTables, sidecarPath);
+    }
+
+    private static bool RowHashesEqual(Dictionary<string, string> cur, Dictionary<string, string> baseline)
+    {
+        if (cur.Count != baseline.Count)
+        {
+            return false;
+        }
+        foreach (var kv in cur)
+        {
+            if (!baseline.TryGetValue(kv.Key, out var hash) || hash != kv.Value)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>
@@ -192,21 +255,6 @@ public class IncrementalDataExporter : DataExporterBase
             File = "_delta.manifest",
             Content = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(deltaManifest, new JsonSerializerOptions { WriteIndented = true })),
         });
-    }
-
-    /// <summary>
-    /// 该表是否具有稳定的行级键，可做行级 diff：
-    /// - ONE 表：单记录，AutoIndex=0 稳定，放行；
-    /// - 其余：主索引首字段有效 且 基准行键无碰撞（rowHashes 数 == 行数）。
-    /// 联合索引首字段不唯一的表（如 SceneJumpType/Action+Target）行键不可靠，不进增量。
-    /// </summary>
-    private static bool IsStableKey(DefTable table, TableSidecarEntry entry)
-    {
-        if (table.IsSingletonTable)
-        {
-            return true;
-        }
-        return table.IndexFieldIdIndex >= 0 && entry.RowHashes.Count == entry.RowCount;
     }
 
     /// <summary>
@@ -251,6 +299,33 @@ public class IncrementalDataExporter : DataExporterBase
     private static OutputFile WritePatch(DefTable table, string signatureId, List<Record> upserts, List<string> deletes)
     {
         var buf = WritePatchBytes(signatureId, upserts, deletes);
+        return new OutputFile { File = $"{table.OutputDataFile}.patch.bytes", Content = buf.CopyData() };
+    }
+
+    /// <summary>
+    /// 写 DLF1 整表替换 patch：magic + [sig][字符串表][count][rows]，body 与全表 .bytes 完全一致。
+    /// 客户端校验 magic 后释放旧池化容器并复用 Create 全量重建。
+    /// </summary>
+    private static OutputFile WriteReplacePatch(DefTable table, List<Record> records)
+    {
+        var builder = new StringTableBuilder();
+        var visitor = new BinaryDataVisitor { StringTable = builder };
+        // 第一遍：注册行字符串（首见顺序），与 WritePatchBytes 同一两遍法
+        var tmp = new ByteBuf();
+        foreach (var rec in records)
+        {
+            rec.Data.Apply(visitor, tmp);
+        }
+
+        var buf = new ByteBuf();
+        PatchFormat.WriteMagic(buf, PatchFormat.MagicTableFull);
+        buf.WriteString(table.SignatureId);
+        builder.Write(buf);
+        buf.WriteSize(records.Count);
+        foreach (var rec in records)
+        {
+            rec.Data.Apply(visitor, buf);
+        }
         return new OutputFile { File = $"{table.OutputDataFile}.patch.bytes", Content = buf.CopyData() };
     }
 }

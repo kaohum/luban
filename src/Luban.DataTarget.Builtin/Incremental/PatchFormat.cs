@@ -34,6 +34,19 @@ public static class PatchFormat
     public const string MagicTable = "DLP1";
 
     /// <summary>
+    /// 无稳定行键表的整表替换 patch magic（4 字节 ASCII "DLF1"）。
+    /// magic 后的 body 与全表 .bytes 完全一致（[sig][字符串表][count][rows]），
+    /// 客户端校验 magic 后复用 Create 全量重建（先释放旧池化容器）。
+    /// </summary>
+    public const string MagicTableFull = "DLF1";
+
+    /// <summary>
+    /// 复合身份索引行键的字段分隔符（如 "techTypeId+level" -> "101+3"），与索引声明语法一致。
+    /// string 键字段值含此分隔符会被导出拒绝；float/double 禁止作为身份索引字段（ToString 科学计数法可能含分隔符）。
+    /// </summary>
+    public const string KeySeparator = "+";
+
+    /// <summary>
     /// L10N delta patch magic（4 字节 ASCII "LLP1"，string key 格式）。
     /// v2（spec 2026-08-22）已退役：语言键改为显式 int id 后无 string-key 增量路径，
     /// 保留常量仅作线上存量 patch 的格式鉴别（旧客户端按 magic 拒绝 LLP2，反之亦然）。

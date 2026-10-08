@@ -22,6 +22,15 @@ using System.Collections.Generic;
 
 namespace Luban.Incremental;
 
+/// <summary>sidecar 格式版本常量。v1 起记录 IdentityIndex（行级 diff 的身份索引）。</summary>
+public static class SidecarFormat
+{
+    public const int CurrentVersion = 1;
+
+    /// <summary>单例表在 IdentityIndex 中的标记值（单例表无索引组，行 diff 固定走单记录 upsert）。</summary>
+    public const string SingletonIdentityMarker = "$one";
+}
+
 /// <summary>
 /// 基准 sidecar（普通表），per-target。
 /// 记录每张表的结构签名、模式、主键、行数及 per-row MD5（按目标 group 过滤字段算）。
@@ -29,6 +38,9 @@ namespace Luban.Incremental;
 /// </summary>
 public class BaselineSidecar
 {
+    /// <summary>sidecar 格式版本；旧版文件（缺身份索引信息）会被增量导出拒绝并要求重跑基准。</summary>
+    public int Version { get; set; }
+
     public string Target { get; set; } = "";
 
     public Dictionary<string, TableSidecarEntry> Tables { get; set; } = new();
@@ -45,6 +57,14 @@ public class TableSidecarEntry
 
     public string PrimaryKeyIndex { get; set; } = "";
 
+    /// <summary>
+    /// 行级 diff 的身份索引名（IndexInfo.IndexName，如 "techTypeId+level"）；"$one" = 单例表；
+    /// "" = 无稳定行键（整表替换模式：基准时无单值索引或身份键数据重复，RowHashes 用记录序号键仅供变更检测）。
+    /// 由基准导出按数据唯一性选定，客户端 MergeApply 的身份键（cs 模板 first_single_index）与之一致；
+    /// 增量时与当前数据重算结果比对，漂移即结构级失败（需重跑基准以同步客户端代码）。
+    /// </summary>
+    public string IdentityIndex { get; set; } = "";
+
     public int RowCount { get; set; }
 
     /// <summary>
@@ -57,6 +77,11 @@ public class TableSidecarEntry
     /// </summary>
     public long Stamp { get; set; }
 
+    /// <summary>
+    /// per-row MD5（按目标 group 过滤字段、内联字符串算）。
+    /// 键分两种口径：行 diff 模式 = 身份索引全键（"101+3"，复合索引各字段以 '+' 拼接）；
+    /// 整表替换模式 = 记录序号（"0"、"1"...，仅做变更检测，不做行寻址）。
+    /// </summary>
     public Dictionary<string, string> RowHashes { get; set; } = new();
 }
 
