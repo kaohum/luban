@@ -135,11 +135,41 @@ public class BinaryUnderlyingDeserializeVisitor : ITypeFuncVisitor<string, strin
 
     public string Accept(TArray type, string bufName, string fieldName, int depth)
     {
+        // 原语元素一维数组走 ByteBuf.ReadXxxArray 批量读取:解码循环落在 AOT 运行时侧,
+        // 热更域解释器每个数组只付一次调用开销——逐元素解释循环是热更配置解表的 dominate 耗时。
+        // 不适用批量(维持逐元素循环):多维数组、可空元素、byte/double(游戏流式读取器未 override,
+        // 流上会读错数据)、枚举(字段类型不匹配)、文本索引串(元素是 ReadInt 而非字符串索引)。
+        if (type.Dimension == 1 && !type.ElementType.IsNullable)
+        {
+            string bulkMethod = TryGetBulkReadMethodName(type.ElementType);
+            if (bulkMethod != null)
+            {
+                return $"{fieldName} = {bufName}.{bulkMethod}();";
+            }
+        }
         string n = $"__n{depth}";
         string e = $"__e{depth}";
         string index = $"__index{depth}";
         string typeStr = CreateNewArrayWithSize(type, n);
         return $"{{int {n} = {bufName}.ReadSize(); {fieldName} = new {typeStr};for(var {index} = 0 ; {index} < {n} ; {index}++) {{ {type.ElementType.Apply(DeclaringTypeNameVisitor.Ins)} {e};{type.ElementType.Apply(this, bufName, $"{e}", depth + 1)} {fieldName}[{index}] = {e};}}}}";
+    }
+
+    /// <summary>
+    /// 原语元素类型对应的 ByteBuf 批量读取方法名；无批量方法（需逐元素循环）返回 null。
+    /// 仅限游戏流式读取器已 override 的元素读取（bool/short/int/long/float/字符串索引）。
+    /// </summary>
+    private static string TryGetBulkReadMethodName(TType elementType)
+    {
+        switch (elementType)
+        {
+            case TInt: return "ReadIntArray";
+            case TLong: return "ReadLongArray";
+            case TFloat: return "ReadFloatArray";
+            case TBool: return "ReadBoolArray";
+            case TShort: return "ReadShortArray";
+            case TString ts when !L10NTextIndexTypeUtil.IsTextIndex(ts): return "ReadStringIndexArray";
+            default: return null;
+        }
     }
 
     public string Accept(TList type, string bufName, string fieldName, int depth)
