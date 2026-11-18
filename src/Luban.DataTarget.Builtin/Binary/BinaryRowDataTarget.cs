@@ -155,6 +155,11 @@ public class BinaryRowDataTarget : DataTargetBase
             case TLong: WriteLE64(fixedBuf, ((DLong)field).Value); break;
             case TDouble: WriteLE64(fixedBuf, DoubleBits(((DDouble)field).Value)); break;
             case TDateTime: WriteLE64(fixedBuf, ((DDateTime)field).UnixTimeOfCurrentContext()); break;
+            case TDay: WriteLE64(fixedBuf, ((DDay)field).Value); break;
+            case THour: WriteLE64(fixedBuf, ((DHour)field).Value); break;
+            case TMinute: WriteLE64(fixedBuf, ((DMinute)field).Value); break;
+            case TSecond: WriteLE64(fixedBuf, ((DSecond)field).Value); break;
+            case TMillisecond: WriteLE64(fixedBuf, ((DMillisecond)field).Value); break;
             case TString:
                 // 多语言 text-id 字段（值类型语言 key）：数据为 DInt，生成代码侧为 int，槽宽同为 4B
                 if (field is DString ds)
@@ -168,7 +173,9 @@ public class BinaryRowDataTarget : DataTargetBase
                 break;
             default:
                 // 变长（bean/list/array/set/map）：紧凑序列化（字符串走表索引）→ 内容寻址去重 → pool 指针
+                // nullable 槽的读取端生成 if(ReadBool()){值} 前缀约定——blob 内容须带 bool true 前缀对齐
                 scratch.Clear();
+                if (nullable) scratch.WriteBool(true);
                 field.Apply(visitor, scratch);
                 var blob = scratch.CopyData();
                 string hash;
