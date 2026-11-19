@@ -71,6 +71,7 @@ public class BinaryRowDataTarget : DataTargetBase
         public byte Width;      // Narrow: FOR 宽度；Palette: 索引宽度
         public long Min;        // Narrow: 基准最小值
         public long[] Palette;  // Palette: 值表
+        public byte PaletteValWidth; // Palette: 值表元素宽度（按值域最小化）
         public Dictionary<long, int> PaletteIndex; // 装配期索引
         public bool IsStringIndex; // TString 且数据为 DString（字符串表索引）——区别于 text-id(int)
         public bool Nullable;
@@ -151,29 +152,17 @@ public class BinaryRowDataTarget : DataTargetBase
             throw new Exception($"[bin-row] 共享池超 u24: {table.Name} pool={poolBuf.Size}");
         }
 
-        // 4. header（版本 + 签名 + 字符串表 + n + plan）
+        // 4. header（版本 + 签名 + 字符串表 + n + plan 段）
+        var planBuf = BuildPlanBytes(plans);
         var headerBuf = new ByteBuf(1 << 10);
         headerBuf.WriteByte(FormatVersion);
         headerBuf.WriteString(table.SignatureId);
         builder.Write(headerBuf);
         headerBuf.WriteSize(records.Count);
-        headerBuf.WriteSize(plans.Length);
-        foreach (var p in plans)
-        {
-            headerBuf.WriteByte(p.Kind);
-            headerBuf.WriteString(p.Name);
-            headerBuf.WriteByte(p.Width);
-            headerBuf.WriteByte(p.Nullable ? (byte)1 : (byte)0);
-            if (p.Kind == KindNarrow)
-            {
-                WriteLE64(headerBuf, p.Min);
-            }
-            else if (p.Kind == KindPalette)
-            {
-                headerBuf.WriteSize(p.Palette.Length);
-                foreach (var v in p.Palette) WriteLE64(headerBuf, v);
-            }
-        }
+        headerBuf.WriteBytesWithoutSize(planBuf);
+
+        // 4.5 plan sidecar（供 cs-bin 二阶段代码生成特化常量；未配置 planDir 时跳过）
+        WritePlanSidecar(table, planBuf);
 
         // 5. 组装
         var bytes = new ByteBuf((int)(12 + headerBuf.Size + fixedBuf.Size + poolBuf.Size));
@@ -297,6 +286,11 @@ public class BinaryRowDataTarget : DataTargetBase
             plan.Width = (byte)iw;
             plan.Palette = new long[distinct.Count];
             distinct.CopyTo(plan.Palette);
+            long pmin = long.MaxValue, pmax = long.MinValue;
+            foreach (var pv in plan.Palette) { if (pv < pmin) pmin = pv; if (pv > pmax) pmax = pv; }
+            plan.PaletteValWidth = pmin >= sbyte.MinValue && pmax <= sbyte.MaxValue ? (byte)1
+                : pmin >= short.MinValue && pmax <= short.MaxValue ? (byte)2
+                : pmin >= int.MinValue && pmax <= int.MaxValue ? (byte)4 : (byte)8;
             plan.PaletteIndex = new Dictionary<long, int>(distinct.Count);
             for (int k = 0; k < plan.Palette.Length; k++) plan.PaletteIndex[plan.Palette[k]] = k;
             return;
@@ -451,6 +445,48 @@ public class BinaryRowDataTarget : DataTargetBase
                 return;
             }
         }
+    }
+
+    /// <summary>plan 段序列化：planCount + 每列 kind/name/width/nullable [+ Narrow min] [+ Palette valWidth/count/values]。</summary>
+    private static byte[] BuildPlanBytes(FieldPlan[] plans)
+    {
+        var planBuf = new ByteBuf(1 << 10);
+        planBuf.WriteSize(plans.Length);
+        foreach (var p in plans)
+        {
+            planBuf.WriteByte(p.Kind);
+            planBuf.WriteString(p.Name);
+            planBuf.WriteByte(p.Width);
+            planBuf.WriteByte(p.Nullable ? (byte)1 : (byte)0);
+            if (p.Kind == KindNarrow)
+            {
+                WriteLE64(planBuf, p.Min);
+            }
+            else if (p.Kind == KindPalette)
+            {
+                planBuf.WriteByte(p.PaletteValWidth);
+                planBuf.WriteSize(p.Palette.Length);
+                foreach (var v in p.Palette)
+                {
+                    ulong raw = unchecked((ulong)v);
+                    for (int i = 0; i < p.PaletteValWidth; i++) planBuf.WriteByte((byte)(raw >> (8 * i)));
+                }
+            }
+        }
+        return planBuf.CopyData();
+    }
+
+    /// <summary>plan sidecar 落盘（{OutputDataFile}.plan，内容 = plan 段原始字节；cs-bin 生成期按名消费）。</summary>
+    private void WritePlanSidecar(DefTable table, byte[] planBuf)
+    {
+        string planDir = EnvManager.Current.GetOptionOrDefault("bin-row", "planDir", true, "");
+        if (string.IsNullOrWhiteSpace(planDir))
+        {
+            return;
+        }
+        System.IO.Directory.CreateDirectory(planDir);
+        string path = System.IO.Path.Combine(planDir, $"{table.OutputDataFile}.plan");
+        System.IO.File.WriteAllBytes(path, planBuf);
     }
 
     /// <summary>槽宽（不含 nullable flag；Raw 用；与 cs-bin 模板宽度表严格一致）。</summary>
