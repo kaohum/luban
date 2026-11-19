@@ -43,7 +43,8 @@ public static class BinRowPlanAnalyzer
         public Dictionary<string, FieldPlanEntry> FieldsByName;
     }
 
-    private static readonly Dictionary<string, TablePlan> s_cache = new(StringComparer.Ordinal);
+    // 导出按表并行（DataExporterBase 用 Task.Run），代码生成亦可能并发渲染——缓存必须线程安全
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, TablePlan> s_cache = new(StringComparer.Ordinal);
 
     public static TablePlan Get(DefTable table, List<Record> records)
     {
@@ -52,9 +53,7 @@ public static class BinRowPlanAnalyzer
         {
             return cached;
         }
-        var plan = Analyze(table, records ?? new List<Record>());
-        s_cache[key] = plan;
-        return plan;
+        return s_cache.GetOrAdd(key, _ => Analyze(table, records ?? new List<Record>()));
     }
 
     private static TablePlan Analyze(DefTable table, List<Record> records)
