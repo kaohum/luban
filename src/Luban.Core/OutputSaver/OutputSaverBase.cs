@@ -48,15 +48,12 @@ public abstract class OutputSaverBase : IOutputSaver
     {
         string outputDir = GetOutputDir(outputFileManifest);
         BeforeSave(outputFileManifest, outputDir);
-        var tasks = new List<Task>();
+        // 顺序落盘：manifest 同名条目语义须为"后者覆盖前者"（组合导出器在 compact 之后追加
+        // bin-row 覆盖条目，并行保存会造成同路径竞态、随机胜者）
         foreach (var outputFile in outputFileManifest.DataFiles)
         {
-            tasks.Add(Task.Run(() =>
-            {
-                SaveFile(outputFileManifest, outputDir, outputFile);
-            }));
+            SaveFile(outputFileManifest, outputDir, outputFile);
         }
-        Task.WaitAll(tasks.ToArray());
         PostSave(outputFileManifest, outputDir);
     }
 

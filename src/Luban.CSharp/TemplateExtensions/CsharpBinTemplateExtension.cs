@@ -32,10 +32,10 @@ public class CsharpBinTemplateExtension : ScriptObject
         return type.Apply(BinaryDeserializeVisitor.Ins, bufName, fieldName);
     }
 
-    /// <summary>bin-row v3 二阶段：取某表某字段的列编码方案（导出期 plan sidecar）。</summary>
-    public static BinRowPlanField BinPlanField(DefTable table, string fieldName)
+    /// <summary>bin-row v3：取某表某字段的列编码方案（与导出器共享同一份进程内分析）。</summary>
+    public static Luban.DataExporter.Builtin.Binary.BinRowPlanAnalyzer.FieldPlanEntry BinPlanField(GenerationContext ctx, DefTable table, string fieldName)
     {
-        var plan = BinRowPlanStore.Get(table);
+        var plan = GetPlan(ctx, table);
         if (!plan.FieldsByName.TryGetValue(fieldName, out var f))
         {
             throw new System.Exception($"[cs-bin] plan 缺列: {table.FullName}.{fieldName}");
@@ -44,8 +44,14 @@ public class CsharpBinTemplateExtension : ScriptObject
     }
 
     /// <summary>行步长（生成期常量来源）。</summary>
-    public static int BinPlanStride(DefTable table) => BinRowPlanStore.Get(table).Stride;
+    public static int BinPlanStride(GenerationContext ctx, DefTable table) => GetPlan(ctx, table).Stride;
 
     /// <summary>plan 段 FNV1a64 哈希（C# ulong 字面量文本，供加载期与文件头 plan 段比对 fail-loud）。</summary>
-    public static string BinPlanHash(DefTable table) => BinRowPlanStore.Get(table).Hash.ToString() + "UL";
+    public static string BinPlanHash(GenerationContext ctx, DefTable table) => GetPlan(ctx, table).Hash.ToString() + "UL";
+
+    private static Luban.DataExporter.Builtin.Binary.BinRowPlanAnalyzer.TablePlan GetPlan(GenerationContext ctx, DefTable table)
+    {
+        var info = ctx.GetTableDataInfo(table);
+        return Luban.DataExporter.Builtin.Binary.BinRowPlanAnalyzer.Get(table, info?.FinalRecords);
+    }
 }
