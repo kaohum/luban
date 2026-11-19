@@ -28,6 +28,16 @@ public class OmnibusBaselineBinRowExporter : DataExporterBase
 
         // 2. compact 暂存（可选）：供服务端 classpath 等 compact 消费方（此刻 basic/ 条目全为 compact 产物）
         string stageDir = EnvManager.Current.GetOptionOrDefault("omnibus-baseline-binrow", "compactStageDir", true, "");
+        var compactBasic = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in manifest.DataFiles)
+        {
+            if (f.File == null) continue;
+            var norm = f.File.Replace('\\', '/');
+            if (norm.StartsWith("basic/", StringComparison.OrdinalIgnoreCase))
+            {
+                compactBasic.Add(norm);
+            }
+        }
         if (!string.IsNullOrWhiteSpace(stageDir))
         {
             if (Directory.Exists(stageDir)) Directory.Delete(stageDir, true);
@@ -63,9 +73,15 @@ public class OmnibusBaselineBinRowExporter : DataExporterBase
                 continue;
             }
             var of = rowTarget.ExportTable(table, records);
+            var target = "basic/" + of.File;
+            if (!compactBasic.Contains(target))
+            {
+                // compact 基础条目缺失（tag 目录名漂移/导出集不一致）——静默覆盖会产出混合格式，直接 fail-loud
+                throw new Exception($"[omnibus-baseline-binrow] 缺少 compact 条目: {target}（basic 目录布局与预期不符）");
+            }
             manifest.AddFile(new OutputFile
             {
-                File = "basic/" + of.File,
+                File = target,
                 Content = of.GetContentBytes(),
             });
             written++;
